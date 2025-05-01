@@ -1,0 +1,63 @@
+[gd_scene load_steps=11 format=3 uid="uid://8022g12qnv2t"]
+
+[ext_resource type="Script" path="res://scripts/rooms/parallax_background.gd" id="1_u1jl5"]
+[ext_resource type="Texture2D" uid="uid://ektcv0lijo3d" path="res://assets/environment/Parallax Cave/1.png" id="2_63n03"]
+[ext_resource type="Texture2D" uid="uid://bao7kyqnma8e4" path="res://assets/environment/Parallax Cave/2.png" id="3_uvw8t"]
+[ext_resource type="Texture2D" uid="uid://i7xayhvfudhe" path="res://assets/environment/Parallax Cave/3fx.png" id="4_gq2wi"]
+[ext_resource type="Texture2D" uid="uid://bcwvpgsu8prqv" path="res://assets/environment/Parallax Cave/4.png" id="5_vaclp"]
+[ext_resource type="Texture2D" uid="uid://do36e4hgdfor4" path="res://assets/environment/Parallax Cave/5.png" id="6_3omb8"]
+[ext_resource type="Texture2D" uid="uid://o0omc0dmwwec" path="res://assets/environment/Parallax Cave/6fx.png" id="7_so4hp"]
+[ext_resource type="Texture2D" uid="uid://wudkipswpryq" path="res://assets/environment/Parallax Cave/7.png" id="8_328tk"]
+[ext_resource type="Texture2D" uid="uid://bftpwlql8si17" path="res://assets/environment/Parallax Cave/8fx.png" id="9_5b07c"]
+[ext_resource type="Texture2D" uid="uid://brqlbyx8u8n3b" path="res://assets/environment/Parallax Cave/9.png" id="10_bndst"]
+
+[node name="ParallaxBackground" type="ParallaxBackground"]
+script = ExtResource("1_u1jl5")
+
+[node name="Layer1" type="ParallaxLayer" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer1"]
+texture = ExtResource("2_63n03")
+
+[node name="Layer2" type="ParallaxLayer" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer2"]
+texture = ExtResource("3_uvw8t")
+
+[node name="Layer3" type="ParallaxLayer" parent="."]
+use_parent_material = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer3"]
+texture = ExtResource("4_gq2wi")
+
+[node name="Layer4" type="ParallaxLayer" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer4"]
+texture = ExtResource("5_vaclp")
+
+[node name="Layer5" type="ParallaxLayer" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer5"]
+texture = ExtResource("6_3omb8")
+
+[node name="Layer6" type="ParallaxLayer" parent="."]
+use_parent_material = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer6"]
+texture = ExtResource("7_so4hp")
+
+[node name="Layer7" type="ParallaxLayer" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer7"]
+texture = ExtResource("8_328tk")
+
+[node name="Layer8" type="ParallaxLayer" parent="."]
+use_parent_material = true
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer8"]
+texture = ExtResource("9_5b07c")
+
+[node name="Layer9" type="ParallaxLayer" parent="."]
+
+[node name="Sprite2D" type="Sprite2D" parent="Layer9"]
+texture = ExtResource("10_bndst")

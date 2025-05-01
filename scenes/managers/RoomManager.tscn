@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://vfxs4j08pfup"]
+
+[ext_resource type="Script" path="res://scripts/managers/RoomManager.gd" id="1_iarnq"]
+
+[node name="Node2D" type="Node2D"]
+script = ExtResource("1_iarnq")

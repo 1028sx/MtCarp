@@ -1,0 +1,127 @@
+[gd_scene load_steps=12 format=3 uid="uid://c5dkwfaxe46h1"]
+
+[ext_resource type="Script" path="res://scripts/ui/settings_menu.gd" id="1_igh48"]
+[ext_resource type="Texture2D" uid="uid://3a8eqlo4x6bj" path="res://assets/UI/RectangleBox_96x96.png" id="2_jfujy"]
+[ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="3_dmtw5"]
+[ext_resource type="Texture2D" uid="uid://b2nip0y5unk5w" path="res://assets/UI/SupremeUIPack/Common/Square_Button_Empty.png" id="4_3lygp"]
+[ext_resource type="Texture2D" uid="uid://cxy3wrknalkv2" path="res://assets/UI/SupremeUIPack/Long Buttons/B_Long_Yellow.png" id="4_qco38"]
+[ext_resource type="Texture2D" uid="uid://d2ryylxc6i1le" path="res://assets/UI/SupremeUIPack/Common/Square_Button_Fill.png" id="5_te0ew"]
+[ext_resource type="Texture2D" uid="uid://s0slfgiy18mp" path="res://assets/UI/SupremeUIPack/Common/Handle_Short_Left-Right.png" id="6_0ncd2"]
+[ext_resource type="Texture2D" uid="uid://81i3ct6whwh2" path="res://assets/UI/SupremeUIPack/Common/Square_Button_On.png" id="6_2yosp"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_wcexh"]
+atlas = ExtResource("4_qco38")
+region = Rect2(0, 0, 38.0851, 18.4127)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_pb287"]
+atlas = ExtResource("4_qco38")
+region = Rect2(76.1507, -0.0707016, 38.3027, 18.4985)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0i321"]
+atlas = ExtResource("4_qco38")
+region = Rect2(38.0656, 0, 38.9556, 18)
+
+[node name="PauseMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("1_igh48")
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+offset_right = 1152.0
+offset_bottom = 650.0
+
+[node name="TextureRect" type="TextureRect" parent="Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -435.0
+offset_top = -167.0
+offset_right = 455.0
+offset_bottom = 114.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_jfujy")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -338.0
+offset_top = -131.0
+offset_right = -183.0
+offset_bottom = -64.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(4, 4)
+
+[node name="VolumeSettings" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="VolumeLabel" type="Label" parent="Panel/VBoxContainer/VolumeSettings"]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_dmtw5")
+theme_override_font_sizes/font_size = 12
+text = "音量：100%"
+
+[node name="VolumeBar" type="ProgressBar" parent="Panel/VBoxContainer/VolumeSettings"]
+custom_minimum_size = Vector2(100, 10)
+layout_mode = 2
+size_flags_vertical = 4
+step = 1.0
+rounded = true
+show_percentage = false
+
+[node name="Slider" type="TextureRect" parent="Panel/VBoxContainer/VolumeSettings/VolumeBar"]
+layout_mode = 2
+offset_top = -1.0
+offset_right = 41.0
+offset_bottom = 23.0
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("6_0ncd2")
+stretch_mode = 4
+
+[node name="FullscreenSettings" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/FullscreenSettings"]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_dmtw5")
+theme_override_font_sizes/font_size = 12
+text = "全螢幕    "
+
+[node name="FullscreenButton" type="TextureButton" parent="Panel/VBoxContainer/FullscreenSettings"]
+layout_mode = 2
+size_flags_horizontal = 0
+toggle_mode = true
+texture_normal = ExtResource("4_3lygp")
+texture_pressed = ExtResource("5_te0ew")
+texture_hover = ExtResource("6_2yosp")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Panel/VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("3_dmtw5")
+theme_override_font_sizes/font_size = 12
+text = "返回       "
+
+[node name="BackButton" type="TextureButton" parent="Panel/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+texture_normal = SubResource("AtlasTexture_wcexh")
+texture_pressed = SubResource("AtlasTexture_pb287")
+texture_hover = SubResource("AtlasTexture_0i321")
+stretch_mode = 0

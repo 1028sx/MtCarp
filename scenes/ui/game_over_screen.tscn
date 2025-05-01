@@ -1,0 +1,129 @@
+[gd_scene load_steps=12 format=3 uid="uid://bmxb481600v1h"]
+
+[ext_resource type="Script" path="res://scripts/ui/game_over_screen.gd" id="1_g68e0"]
+[ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="2_yktok"]
+[ext_resource type="Texture2D" uid="uid://bsekwhmjbu3k4" path="res://assets/icons/info/DC/default.png" id="3_ije6l"]
+[ext_resource type="Texture2D" uid="uid://dofyyehibcyw" path="res://assets/icons/info/DC/pressed.png" id="4_sfn7t"]
+[ext_resource type="Texture2D" uid="uid://c2jpgetppy6j4" path="res://assets/icons/info/DC/hover.png" id="5_irsj8"]
+[ext_resource type="Texture2D" uid="uid://ch6iwicb0y7be" path="res://assets/icons/info/GH/default.png" id="6_gbnns"]
+[ext_resource type="Texture2D" uid="uid://bajw88o6eben4" path="res://assets/icons/info/GH/pressed.png" id="7_sk6cc"]
+[ext_resource type="Texture2D" uid="uid://dudptsc7mbhht" path="res://assets/icons/info/GH/hover.png" id="8_c2jcx"]
+[ext_resource type="Texture2D" uid="uid://dqdgkv26woerq" path="res://assets/icons/info/GF/default.png" id="9_asu6w"]
+[ext_resource type="Texture2D" uid="uid://dty33ihtgf4v5" path="res://assets/icons/info/GF/pressed.png" id="10_v6wn0"]
+[ext_resource type="Texture2D" uid="uid://cw2l40uu4sq1m" path="res://assets/icons/info/GF/hover.png" id="11_c4yqt"]
+
+[node name="GameOverScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_g68e0")
+
+[node name="ColorRect" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.623529)
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 0
+offset_right = 364.0
+offset_bottom = 442.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+
+[node name="Label_Title" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 60
+text = "遊戲結束"
+
+[node name="HSeparator2" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label_Stats" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 48
+text = "感謝你的遊玩！"
+
+[node name="VBoxContainer_Stats" type="VBoxContainer" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label_PlayTime" type="Label" parent="CenterContainer/VBoxContainer/VBoxContainer_Stats"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 36
+
+[node name="Label_KillCount" type="Label" parent="CenterContainer/VBoxContainer/VBoxContainer_Stats"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 36
+
+[node name="Label_MaxCombo" type="Label" parent="CenterContainer/VBoxContainer/VBoxContainer_Stats"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 36
+
+[node name="Label_Gold" type="Label" parent="CenterContainer/VBoxContainer/VBoxContainer_Stats"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 36
+
+[node name="HSeparator3" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label_Links" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 48
+text = "聯繫作者："
+
+[node name="HBoxContainer_Links" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Button_Discord" type="TextureButton" parent="CenterContainer/VBoxContainer/HBoxContainer_Links"]
+layout_mode = 2
+size_flags_horizontal = 0
+texture_normal = ExtResource("3_ije6l")
+texture_pressed = ExtResource("4_sfn7t")
+texture_hover = ExtResource("5_irsj8")
+stretch_mode = 0
+
+[node name="Button_GitHub" type="TextureButton" parent="CenterContainer/VBoxContainer/HBoxContainer_Links"]
+layout_mode = 2
+size_flags_horizontal = 0
+texture_normal = ExtResource("6_gbnns")
+texture_pressed = ExtResource("7_sk6cc")
+texture_hover = ExtResource("8_c2jcx")
+stretch_mode = 0
+
+[node name="Button_Feedback" type="TextureButton" parent="CenterContainer/VBoxContainer/HBoxContainer_Links"]
+layout_mode = 2
+size_flags_horizontal = 0
+texture_normal = ExtResource("9_asu6w")
+texture_pressed = ExtResource("10_v6wn0")
+texture_hover = ExtResource("11_c4yqt")
+stretch_mode = 0
+
+[node name="Label" type="Label" parent="CenterContainer/VBoxContainer/HBoxContainer_Links"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 24
+
+[node name="HSeparator" type="HSeparator" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label_Links2" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_yktok")
+theme_override_font_sizes/font_size = 36
+text = "歡迎與我聯繫
+記得填寫表單！
+Esc以回到主畫面"

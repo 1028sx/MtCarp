@@ -1,0 +1,46 @@
+# Godot 4+ specific ignores
+.godot/
+!.godot/icon.svg
+!.godot/project.godot
+
+# Mono-specific ignores (if applicable, uncomment)
+# .mono/
+# data_*/
+# dlls/
+# modules/mono/glue/
+
+# General ignores
+*.o
+*.lo
+*.la
+*.al
+*.libs
+*.so
+*.so.*
+*.a
+*.dll
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*~
+.#*
+*.DS_Store
+*.TMP
+*.tmp
+
+# Exported binaries and packs
+*.exe
+*.pck
+*.zip
+*.tar.gz
+*.dmg
+*.app/
+export_presets.cfg
+
+# User-specific settings (optional)
+# project.godot.user
+# project.binary.user
+
+# Asset Store content (optional, if you want to re-download)
+# addons/

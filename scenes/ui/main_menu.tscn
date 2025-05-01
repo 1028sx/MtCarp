@@ -1,0 +1,107 @@
+[gd_scene load_steps=7 format=3 uid="uid://hxdrwmeg3qq8"]
+
+[ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_ycwaw"]
+[ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="2_6nf0d"]
+[ext_resource type="Texture2D" uid="uid://cxy3wrknalkv2" path="res://assets/UI/SupremeUIPack/Long Buttons/B_Long_Yellow.png" id="3_51j1k"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_a41k8"]
+atlas = ExtResource("3_51j1k")
+region = Rect2(0, 0, 38.0851, 18.4127)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lnl04"]
+atlas = ExtResource("3_51j1k")
+region = Rect2(76.1507, -0.0707016, 38.3027, 18.4985)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ds0h5"]
+atlas = ExtResource("3_51j1k")
+region = Rect2(38.0656, 0, 38.9556, 18)
+
+[node name="MainMenu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_ycwaw")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -203.0
+offset_top = -268.0
+offset_right = 213.0
+offset_bottom = -156.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_fonts/font = ExtResource("2_6nf0d")
+theme_override_font_sizes/font_size = 96
+text = "壁上物語"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -317.0
+offset_top = -20.0
+offset_right = -189.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+scale = Vector2(5, 5)
+
+[node name="HBoxContainer2" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer2"]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_6nf0d")
+theme_override_font_sizes/font_size = 12
+text = "開始遊戲"
+
+[node name="StartButton" type="TextureButton" parent="VBoxContainer/HBoxContainer2"]
+layout_mode = 2
+size_flags_horizontal = 0
+texture_normal = SubResource("AtlasTexture_a41k8")
+texture_pressed = SubResource("AtlasTexture_lnl04")
+texture_hover = SubResource("AtlasTexture_ds0h5")
+stretch_mode = 5
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer"]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+theme_override_fonts/font = ExtResource("2_6nf0d")
+theme_override_font_sizes/font_size = 12
+text = "離開遊戲"
+
+[node name="QuitButton" type="TextureButton" parent="VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+texture_normal = SubResource("AtlasTexture_a41k8")
+texture_pressed = SubResource("AtlasTexture_lnl04")
+texture_hover = SubResource("AtlasTexture_ds0h5")
+stretch_mode = 5
+
+[connection signal="pressed" from="VBoxContainer/HBoxContainer2/StartButton" to="." method="_on_back_button_pressed"]
+[connection signal="pressed" from="VBoxContainer/HBoxContainer/QuitButton" to="." method="_on_back_button_pressed"]

@@ -1,0 +1,158 @@
+[gd_scene load_steps=23 format=3 uid="uid://b4umvs1a7ueba"]
+
+[ext_resource type="Script" path="res://scripts/rooms/room_transition.gd" id="1_7vjjd"]
+[ext_resource type="Texture2D" uid="uid://cs3jh01hm4pyw" path="res://assets/enemies/Effect Pack #8/B Idle.png" id="2_d5n84"]
+[ext_resource type="Texture2D" uid="uid://lu5ywln6ro7k" path="res://assets/enemies/Effect Pack #8/B Start.png" id="3_u7nb6"]
+[ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="4_cp3sa"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_d42np"]
+size = Vector2(20, 103)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_674ne"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(0, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_j2owb"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(128, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lr063"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(256, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5ggi7"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(384, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jx1hk"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(512, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_j8n8w"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(640, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_uyu8s"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(768, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_bxdx3"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(896, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3fa7m"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(1024, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_rqxpp"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(1152, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5njdg"]
+atlas = ExtResource("2_d5n84")
+region = Rect2(1280, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_umacg"]
+atlas = ExtResource("3_u7nb6")
+region = Rect2(0, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lxp02"]
+atlas = ExtResource("3_u7nb6")
+region = Rect2(128, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lw638"]
+atlas = ExtResource("3_u7nb6")
+region = Rect2(256, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1qtep"]
+atlas = ExtResource("3_u7nb6")
+region = Rect2(384, 0, 128, 256)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_4r432"]
+atlas = ExtResource("3_u7nb6")
+region = Rect2(512, 0, 128, 256)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_1lg71"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_674ne")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_j2owb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lr063")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_5ggi7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jx1hk")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_j8n8w")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_uyu8s")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_bxdx3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3fa7m")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_rqxpp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_5njdg")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 12.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_umacg")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lxp02")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lw638")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1qtep")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_4r432")
+}],
+"loop": false,
+"name": &"start",
+"speed": 12.0
+}]
+
+[node name="Door" type="Area2D"]
+script = ExtResource("1_7vjjd")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_d42np")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+position = Vector2(0, -8)
+scale = Vector2(0.773438, 0.773438)
+sprite_frames = SubResource("SpriteFrames_1lg71")
+animation = &"start"
+frame = 4
+frame_progress = 1.0
+
+[node name="Label_Interaction" type="Label" parent="."]
+offset_left = -33.0
+offset_top = -108.0
+offset_right = 32.0
+offset_bottom = -77.0
+theme_override_fonts/font = ExtResource("4_cp3sa")
+theme_override_font_sizes/font_size = 12
+text = "SPACE
+前往下個房間"

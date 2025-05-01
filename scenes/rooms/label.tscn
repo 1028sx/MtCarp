@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3 uid="uid://gj3labnn3ror"]
+
+[ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="1_n17qr"]
+[ext_resource type="Script" path="res://scripts/rooms/label.gd" id="1_ora76"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ak1ph"]
+radius = 118.0
+
+[node name="label" type="Area2D"]
+script = ExtResource("1_ora76")
+display_text = "SPACE鍵跳躍"
+
+[node name="Label" type="Label" parent="."]
+offset_right = 40.0
+offset_bottom = 23.0
+theme_override_fonts/font = ExtResource("1_n17qr")
+theme_override_font_sizes/font_size = 24
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(63, 11)
+shape = SubResource("CircleShape2D_ak1ph")

@@ -1,0 +1,22 @@
+[gd_scene load_steps=4 format=3 uid="uid://xqhtcmo2n7j0"]
+
+[ext_resource type="Script" path="res://scripts/ui/inventory_ui.gd" id="1_m1ccu"]
+[ext_resource type="PackedScene" uid="uid://crie0nx25jkyo" path="res://scenes/ui/word_collection_ui.tscn" id="2_b0fqo"]
+[ext_resource type="PackedScene" uid="uid://5kwl427kxi67" path="res://scenes/ui/effect_list.tscn" id="3_uwmh1"]
+
+[node name="InventoryUI" type="Control" groups=["inventory_ui"]]
+process_mode = 3
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_m1ccu")
+
+[node name="WordCollectionUI" parent="." instance=ExtResource("2_b0fqo")]
+layout_mode = 1
+
+[node name="EffectList" parent="." instance=ExtResource("3_uwmh1")]
+process_mode = 3
+layout_mode = 1

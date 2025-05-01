@@ -1,0 +1,30 @@
+[gd_scene load_steps=7 format=3 uid="uid://dupyi4to1435b"]
+
+[ext_resource type="Script" path="res://scripts/Main.gd" id="1_vwedp"]
+[ext_resource type="PackedScene" uid="uid://b2q5462bdb0q2" path="res://scenes/player/Player.tscn" id="2_65yxm"]
+[ext_resource type="PackedScene" uid="uid://b3r7qpb7qqyqr" path="res://scenes/managers/EnemyManager.tscn" id="3_ekfjl"]
+[ext_resource type="PackedScene" uid="uid://4wmx6pcc3vg0" path="res://scenes/managers/ItemManager.tscn" id="4_hg2ct"]
+[ext_resource type="PackedScene" uid="uid://docm2db81k064" path="res://scenes/ui/UI.tscn" id="6_r5clf"]
+[ext_resource type="PackedScene" uid="uid://h3xx5f835571" path="res://scenes/managers/GameManager.tscn" id="7_y63d1"]
+
+[node name="Main" type="Node2D" groups=["main"]]
+script = ExtResource("1_vwedp")
+
+[node name="Player" parent="." instance=ExtResource("2_65yxm")]
+visible = false
+
+[node name="Camera2D" type="Camera2D" parent="Player"]
+zoom = Vector2(2, 2)
+position_smoothing_enabled = true
+
+[node name="EnemyManager" parent="." instance=ExtResource("3_ekfjl")]
+
+[node name="ItemManager" parent="." instance=ExtResource("4_hg2ct")]
+
+[node name="GameManager" parent="." instance=ExtResource("7_y63d1")]
+
+[node name="CanvasLayer(UI)" parent="." instance=ExtResource("6_r5clf")]
+
+[connection signal="gold_changed" from="Player" to="CanvasLayer(UI)" method="update_gold"]
+[connection signal="health_changed" from="Player" to="." method="_on_player_health_changed"]
+[connection signal="health_changed" from="Player" to="CanvasLayer(UI)" method="_on_player_health_changed"]

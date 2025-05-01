@@ -1,0 +1,116 @@
+[gd_scene load_steps=18 format=3 uid="uid://vqkbbvj03f1m"]
+
+[ext_resource type="Script" path="res://scripts/player/dash_wave.gd" id="1_akubc"]
+[ext_resource type="Texture2D" uid="uid://bojew0k1t7aoc" path="res://assets/players/effects/Effect Pack #7/Effect 6/Effect 6 End.png" id="2_ajk4u"]
+[ext_resource type="Texture2D" uid="uid://dpepkvc86il8n" path="res://assets/players/effects/Effect Pack #7/Effect 6/Effect 6 Idle.png" id="3_130k7"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_36wt7"]
+atlas = ExtResource("2_ajk4u")
+region = Rect2(0, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dd6s8"]
+atlas = ExtResource("2_ajk4u")
+region = Rect2(196, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ys1tl"]
+atlas = ExtResource("2_ajk4u")
+region = Rect2(392, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_4mi0e"]
+atlas = ExtResource("2_ajk4u")
+region = Rect2(588, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_mhk3y"]
+atlas = ExtResource("2_ajk4u")
+region = Rect2(784, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_hocg8"]
+atlas = ExtResource("3_130k7")
+region = Rect2(0, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_cki8i"]
+atlas = ExtResource("3_130k7")
+region = Rect2(196, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sgxb5"]
+atlas = ExtResource("3_130k7")
+region = Rect2(392, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7jlq0"]
+atlas = ExtResource("3_130k7")
+region = Rect2(588, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8synm"]
+atlas = ExtResource("3_130k7")
+region = Rect2(784, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_vo310"]
+atlas = ExtResource("3_130k7")
+region = Rect2(980, 0, 196, 196)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_nrb6l"]
+atlas = ExtResource("3_130k7")
+region = Rect2(1176, 0, 196, 196)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_3ihd5"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_36wt7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dd6s8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ys1tl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_4mi0e")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_mhk3y")
+}],
+"loop": false,
+"name": &"end",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_hocg8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_cki8i")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sgxb5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7jlq0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8synm")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_vo310")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_nrb6l")
+}],
+"loop": false,
+"name": &"idle",
+"speed": 10.0
+}]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_v23hh"]
+radius = 41.0
+height = 150.0
+
+[node name="DashWave" type="Area2D"]
+script = ExtResource("1_akubc")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_3ihd5")
+animation = &"end"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CapsuleShape2D_v23hh")

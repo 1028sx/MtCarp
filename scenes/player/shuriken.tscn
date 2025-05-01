@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3 uid="uid://dkgrx8ycg45p0"]
+
+[ext_resource type="Script" path="res://scripts/player/Shuriken.gd" id="1_a8xjy"]
+[ext_resource type="Texture2D" uid="uid://cftl7tbut25bk" path="res://assets/players/Sprites/shuriken.png" id="2_3o7n8"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_oskod"]
+size = Vector2(10, 10)
+
+[node name="Shuriken" type="Area2D"]
+collision_layer = 32
+collision_mask = 16
+script = ExtResource("1_a8xjy")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_3o7n8")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+rotation = 0.785398
+scale = Vector2(0.48, 0.48)
+shape = SubResource("RectangleShape2D_oskod")
+
+[node name="VisibleOnScreenNotifier2D" type="VisibleOnScreenNotifier2D" parent="."]
+position = Vector2(0, 7.15256e-07)
+rotation = 0.785398
+scale = Vector2(0.24, 0.24)
+
+[connection signal="screen_exited" from="VisibleOnScreenNotifier2D" to="." method="_on_visible_on_screen_notifier_2d_screen_exited"]
