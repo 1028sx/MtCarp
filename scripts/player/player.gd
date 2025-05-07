@@ -42,6 +42,12 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @export_group("Special Attack")
 @export var special_attack_velocity = -400
 @export var special_attack_cooldown = 1.0
+
+@export_group("Wall Jump")
+@export var wall_slide_speed: float = 100.0
+@export var wall_jump_horizontal_force: float = 300.0
+@export var wall_jump_vertical_force_multiplier: float = 0.6
+@export var wall_double_jump_multiplier: float = 0.8
 #endregion
 
 #region 節點引用
@@ -54,6 +60,8 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @onready var jump_impact_area = $JumpImpactArea
 @onready var state_machine = $StateMachine
 @onready var metsys_node = $MetroidvaniaSystem
+@onready var wall_check_left: RayCast2D = $WallCheckLeft
+@onready var wall_check_right: RayCast2D = $WallCheckRight
 
 var shuriken_scene = preload("res://scenes/player/shuriken.tscn")
 var wave_scene = preload("res://scenes/player/dash_wave.tscn")
@@ -133,11 +141,13 @@ var rage_stack := 0
 var rage_stack_limit := 5
 var rage_damage_bonus := 0.1
 
+var wall_jump_cooldown_timer := 0.0
+
 signal health_changed(new_health: int)
 signal player_killed_enemy
 signal died
 signal gold_changed(new_gold: int)
-# signal effect_changed # 註解掉此行
+
 signal effect_changed(effects: Dictionary)
 
 var agile_perfect_dodge := false
@@ -160,6 +170,10 @@ var has_ice_freeze := false
 var ice_freeze_cooldown := 5.0
 var ice_freeze_timer := 0.0
 var ice_freeze_duration := 2.0
+
+var is_wall_sliding := false
+var last_jump_was_wall_jump := false
+var is_double_jumping_after_wall_jump := false
 #endregion
 
 #region 生命週期函數
@@ -171,15 +185,10 @@ func _ready() -> void:
 	current_special_attack_damage = base_special_attack_damage
 	active_effects = {}
 	emit_signal("effect_changed", active_effects)
-	# ---- 添加調試 Start ----
-	print("[Player Ready] Initial jump_velocity: ", jump_velocity)
-	print("[Player Ready] Gravity: ", gravity)
-	# ---- 添加調試 End ----
+
 
 func _physics_process(delta: float) -> void:
-	# ---- 添加調試 Start ----
-	# print("[Physics Process] Time Scale: ", Engine.time_scale) # 暫時註釋掉，如果需要再取消註釋，避免過多輸出
-	# ---- 添加調試 End ----
+
 	if _handle_camera_mode(delta):
 		return
 		
@@ -374,7 +383,7 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 			if state_machine and state_machine.states.has("hurt"):
 				state_machine._transition_to(state_machine.states["hurt"])
 			else:
-				print("警告: 沒有找到 Hurt 狀態，僅設置無敵。")
+				
 				set_physics_process(false)
 				set_process_input(false)
 				died.emit()
@@ -382,8 +391,11 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		if state_machine and state_machine.states.has("hurt"):
 			state_machine._transition_to(state_machine.states["hurt"])
 		else:
-			print("警告: 沒有找到 Hurt 狀態，僅設置無敵。")
+			
 			set_invincible(invincible_duration)
+	
+	last_jump_was_wall_jump = false
+	is_double_jumping_after_wall_jump = false
 
 func set_invincible(duration: float) -> void:
 	if duration > 0:
@@ -444,6 +456,9 @@ func _update_global_timers(delta: float) -> void:
 	if coyote_timer > 0:
 		coyote_timer -= delta
 	
+	if wall_jump_cooldown_timer > 0:
+		wall_jump_cooldown_timer -= delta
+
 	if agile_dodge_timer > 0:
 		agile_dodge_timer -= delta
 		if agile_dodge_timer <= 0:
@@ -471,6 +486,8 @@ func _update_cooldowns(delta: float) -> void:
 func _on_landed() -> void:
 	jump_count = 0
 	coyote_timer = coyote_time
+	last_jump_was_wall_jump = false
+	is_double_jumping_after_wall_jump = false
 
 func get_knockback_force() -> float:
 	var force = 100.0
@@ -498,6 +515,26 @@ func reset_charge_state() -> void:
 		has_played_max_charge_effect = false
 		if effect_manager:
 			effect_manager.stop_charge_effect()
+
+
+
+func get_raycast_wall_normal() -> Vector2:
+
+	if not is_node_ready() or not wall_check_left or not wall_check_right:
+		return Vector2.ZERO
+
+	wall_check_left.force_raycast_update()
+	wall_check_right.force_raycast_update()
+
+	if wall_check_left.is_colliding():
+
+		return Vector2.RIGHT
+	elif wall_check_right.is_colliding():
+
+
+		return Vector2.LEFT
+
+	return Vector2.ZERO
 
 #endregion
 

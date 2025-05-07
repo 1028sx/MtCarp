@@ -7,6 +7,7 @@ extends PlayerState
 @export var attack_state: PlayerState
 @export var special_attack_state: PlayerState
 @export var dash_state: PlayerState
+@export var wall_slide_state: PlayerState
 
 # 可選：空中控制的減速率
 @export var air_control_factor: float = 0.8
@@ -34,6 +35,16 @@ func process_physics(delta: float) -> void:
 	else:
 		# 空中水平減速
 		player.velocity.x = move_toward(player.velocity.x, 0, current_speed) # 使用空中減速度
+
+	# ----- 新增：滑牆檢查 -----
+	# 移除方向判斷，只要接觸牆壁且不在地上就嘗試滑牆
+	# 加入冷卻判斷
+	if wall_slide_state and not player.is_on_floor() and player.wall_jump_cooldown_timer <= 0:
+		var wall_normal = player.get_raycast_wall_normal()
+		if wall_normal != Vector2.ZERO:
+			# 在這裡直接轉換狀態，避免執行 move_and_slide 後卡進牆裡
+			state_machine._transition_to(wall_slide_state)
+			return # 提前退出 process_physics
 
 	# 執行移動
 	player.move_and_slide()

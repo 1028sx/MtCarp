@@ -1,4 +1,4 @@
-[gd_scene load_steps=187 format=3 uid="uid://b2q5462bdb0q2"]
+[gd_scene load_steps=188 format=3 uid="uid://b2q5462bdb0q2"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_b51by"]
 [ext_resource type="Texture2D" uid="uid://cyr1632llp4qs" path="res://assets/players/Sprites/DASH.png" id="2_egfxe"]
@@ -35,6 +35,11 @@
 [ext_resource type="Script" path="res://scripts/player/states/State_Special_Attack.gd" id="26_ye8o0"]
 [ext_resource type="Script" path="res://addons/MetroidvaniaSystem/Scripts/MetroidvaniaSystem.gd" id="27_vq02x"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Hurt.gd" id="34_pa3c0"]
+[ext_resource type="Script" path="res://scripts/player/states/State_WallSlide.gd" id="35_h76fr"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pwo0r"]
+radius = 8.5
+height = 35.0
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_k6qhq"]
 atlas = ExtResource("5_ob6s4")
@@ -268,34 +273,6 @@ region = Rect2(558, 0, 93, 112)
 atlas = ExtResource("11_srnqu")
 region = Rect2(651, 0, 93, 112)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_8wyqu"]
-atlas = ExtResource("12_ct6uc")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_24cv4"]
-atlas = ExtResource("13_h0jfp")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_7a3wl"]
-atlas = ExtResource("14_d6m86")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_2gm5t"]
-atlas = ExtResource("15_qkkh0")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_tqm1m"]
-atlas = ExtResource("16_eieq5")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_vg0ma"]
-atlas = ExtResource("17_7uhp3")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_lecp7"]
-atlas = ExtResource("18_nmo1w")
-region = Rect2(0, 0, 400, 400)
-
 [sub_resource type="AtlasTexture" id="AtlasTexture_6c3c5"]
 atlas = ExtResource("12_1pdjf")
 region = Rect2(0, 0, 93, 112)
@@ -379,6 +356,34 @@ region = Rect2(465, 0, 93, 112)
 [sub_resource type="AtlasTexture" id="AtlasTexture_odvnv"]
 atlas = ExtResource("13_5hd7f")
 region = Rect2(558, 0, 93, 112)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8wyqu"]
+atlas = ExtResource("12_ct6uc")
+region = Rect2(0, 0, 400, 400)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_24cv4"]
+atlas = ExtResource("13_h0jfp")
+region = Rect2(0, 0, 400, 400)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7a3wl"]
+atlas = ExtResource("14_d6m86")
+region = Rect2(0, 0, 400, 400)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2gm5t"]
+atlas = ExtResource("15_qkkh0")
+region = Rect2(0, 0, 400, 400)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_tqm1m"]
+atlas = ExtResource("16_eieq5")
+region = Rect2(0, 0, 400, 400)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_vg0ma"]
+atlas = ExtResource("17_7uhp3")
+region = Rect2(0, 0, 400, 400)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lecp7"]
+atlas = ExtResource("18_nmo1w")
+region = Rect2(0, 0, 400, 400)
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_pdjgy"]
 animations = [{
@@ -608,32 +613,6 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_8wyqu")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_24cv4")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_7a3wl")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_2gm5t")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_tqm1m")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_vg0ma")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_lecp7")
-}],
-"loop": true,
-"name": &"run2",
-"speed": 5.0
-}, {
-"frames": [{
-"duration": 1.0,
 "texture": SubResource("AtlasTexture_6c3c5")
 }, {
 "duration": 1.0,
@@ -704,11 +683,33 @@ animations = [{
 "loop": false,
 "name": &"throw",
 "speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8wyqu")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_24cv4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7a3wl")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_2gm5t")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_tqm1m")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_vg0ma")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lecp7")
+}],
+"loop": true,
+"name": &"wall_slide",
+"speed": 5.0
 }]
-
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pwo0r"]
-radius = 8.5
-height = 35.0
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_a6pnd"]
 radius = 17.0
@@ -1155,17 +1156,17 @@ collision_layer = 2
 script = ExtResource("1_b51by")
 max_health = 1000
 
-[node name="AniSprite2D" type="AnimatedSprite2D" parent="."]
-position = Vector2(-1, -27)
-scale = Vector2(2, 2)
-sprite_frames = SubResource("SpriteFrames_pdjgy")
-animation = &"run"
-
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 visible = false
 position = Vector2(-2, 38)
 scale = Vector2(2, 2)
 shape = SubResource("CapsuleShape2D_pwo0r")
+
+[node name="AniSprite2D" type="AnimatedSprite2D" parent="."]
+position = Vector2(-1, -27)
+scale = Vector2(2, 2)
+sprite_frames = SubResource("SpriteFrames_pdjgy")
+animation = &"idle"
 
 [node name="JumpImpactArea" type="Area2D" parent="."]
 collision_layer = 8
@@ -1263,18 +1264,18 @@ attack_state = NodePath("../Attack")
 special_attack_state = NodePath("../SpecialAttack")
 dash_state = NodePath("../Dash")
 
-[node name="Fall" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "jump_state", "attack_state", "special_attack_state", "dash_state")]
+[node name="Fall" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "jump_state", "attack_state", "special_attack_state", "dash_state", "wall_slide_state")]
 script = ExtResource("22_0x2o7")
 idle_state = NodePath("../Idle")
 jump_state = NodePath("../Jump")
 attack_state = NodePath("../Attack")
 special_attack_state = NodePath("../SpecialAttack")
 dash_state = NodePath("../Dash")
+wall_slide_state = NodePath("../WallSlide")
 
-[node name="Dash" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "fall_state", "attack_state")]
+[node name="Dash" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "attack_state")]
 script = ExtResource("24_8sbic")
 idle_state = NodePath("../Idle")
-fall_state = NodePath("../Fall")
 attack_state = NodePath("../Attack")
 
 [node name="Attack" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "fall_state", "move_state", "jump_state", "dash_state")]
@@ -1293,15 +1294,30 @@ fall_state = NodePath("../Fall")
 [node name="Hurt" type="Node" parent="StateMachine"]
 script = ExtResource("34_pa3c0")
 
-[node name="Jump" type="Node" parent="StateMachine" node_paths=PackedStringArray("fall_state", "attack_state", "special_attack_state", "dash_state")]
+[node name="Jump" type="Node" parent="StateMachine" node_paths=PackedStringArray("fall_state", "attack_state", "special_attack_state", "dash_state", "wall_slide_state")]
 script = ExtResource("23_4ug8u")
 fall_state = NodePath("../Fall")
 attack_state = NodePath("../Attack")
 special_attack_state = NodePath("../SpecialAttack")
 dash_state = NodePath("../Dash")
+wall_slide_state = NodePath("../WallSlide")
+
+[node name="WallSlide" type="Node" parent="StateMachine" node_paths=PackedStringArray("fall_state", "jump_state", "idle_state")]
+script = ExtResource("35_h76fr")
+fall_state = NodePath("../Fall")
+jump_state = NodePath("../Jump")
+idle_state = NodePath("../Idle")
 
 [node name="MetroidvaniaSystem" type="Node" parent="."]
 script = ExtResource("27_vq02x")
+
+[node name="WallCheckLeft" type="RayCast2D" parent="."]
+position = Vector2(-13, 44)
+target_position = Vector2(-10, 0)
+
+[node name="WallCheckRight" type="RayCast2D" parent="."]
+position = Vector2(14, 44)
+target_position = Vector2(13, 0)
 
 [connection signal="health_changed" from="." to="." method="_on_health_changed"]
 [connection signal="effect_finished" from="EffectManager" to="." method="_on_effect_manager_effect_finished"]
