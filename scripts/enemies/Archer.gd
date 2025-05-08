@@ -329,9 +329,11 @@ func take_damage(amount: float) -> void:
 	else:
 		change_state(State.HURT)
 
-func apply_knockback(knockback: Vector2) -> void:
-	# 直接設置擊退速度，不需要考慮當前速度
-	knockback_velocity = knockback * (1.0 - knockback_resistance)
+func apply_knockback(force_vector: Vector2) -> void:
+	knockback_velocity = force_vector
+	# 考慮是否在此處轉換到 HURT 狀態，或依賴 take_damage
+	# if current_state != State.HURT and current_state != State.DIE:
+	# 	change_state(State.HURT)
 
 func _on_detection_area_body_entered(body: Node2D) -> void:
 	if body.is_in_group("player"):

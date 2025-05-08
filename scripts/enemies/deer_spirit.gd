@@ -481,6 +481,12 @@ func change_state(new_state: State):
 		return
 		
 	current_state = new_state
+
+func apply_knockback(force_vector: Vector2) -> void:
+	knockback_velocity = force_vector
+	# 考慮是否在此處轉換到 HURT 狀態
+	# if current_state != State.HURT and current_state != State.DIE:
+	# 	change_state(State.HURT)
 #endregion
 
 #region 死亡處理

@@ -21,6 +21,7 @@ var is_transparent = false
 var player_detected = false
 var flap_timer = 0.0
 var current_speed = BASE_SPEED
+var knockback_velocity = Vector2.ZERO # 新增：擊退速度變數
 
 # 添加動畫狀態枚舉
 enum AnimationState {
@@ -116,6 +117,21 @@ func _connect_signals():
 		detection_area.body_exited.connect(_on_detection_area_body_exited)
 
 func _process(delta: float) -> void:
+	if is_dying:
+		_play_animation("die") # 確保播放死亡動畫
+		# 可能需要一些邏輯讓其在死亡動畫播放完畢後移除
+		return
+
+	# 優先處理擊退
+	if knockback_velocity != Vector2.ZERO:
+		velocity = knockback_velocity
+		move_and_slide() # 確保擊退時也呼叫 move_and_slide
+		knockback_velocity = knockback_velocity.move_toward(Vector2.ZERO, delta * 1000) # 衰減擊退力
+		# 在擊退狀態下，可能不需要執行後續的 _update_transparency 和 _handle_movement
+		# 但動畫更新可能還是需要的，取決於是否有專門的被擊退動畫
+		_update_animation(delta) # 確保動畫更新
+		return # 如果正在被擊退，則跳過常規移動邏輯
+
 	_update_transparency()
 	_handle_movement(delta)
 	_update_animation(delta)
@@ -327,3 +343,9 @@ func die() -> void:
 	
 	# 播放死亡動畫
 	_play_animation("die")
+
+func apply_knockback(force_vector: Vector2) -> void:
+	knockback_velocity = force_vector
+	# 小鳥比較輕，可能被擊退時應該直接進入受傷或特定被擊飛動畫
+	if not is_dying:
+		_play_animation("hurt") # 假設有 hurt 動畫

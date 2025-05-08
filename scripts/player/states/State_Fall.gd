@@ -55,10 +55,16 @@ func get_transition() -> PlayerState:
 		# 可以在這裡添加落地特效或聲音
 		return idle_state
 
-	# 檢查跳躍緩衝 (二段跳)
+	# --- 移除調試輸出 ---
+
 	if player.jump_buffer_timer > 0 and player.jump_count < player.max_jumps:
-		player.jump_buffer_timer = 0.0 # 使用跳躍緩衝後立即消耗掉
-		return jump_state
+		# player.jump_buffer_timer = 0.0 # <--- 不要在此處消耗 jump_buffer_timer
+		# 在轉換前，告訴 JumpState 它是從空中狀態過來的
+		if jump_state is State_Jump: # 類型檢查以安全轉換
+			(jump_state as State_Jump).came_from_air_state = true
+		else:
+			push_error("FallState: jump_state is not of type State_Jump! Ensure jump_state is correctly exported and assigned in the editor for FallState.")
+		return jump_state # 轉換到 JumpState
 	
 	# 檢查攻擊輸入 (空中攻擊)
 	if Input.is_action_just_pressed("attack") and attack_state:

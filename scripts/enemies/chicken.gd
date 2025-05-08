@@ -275,8 +275,11 @@ func take_damage(amount):
 	else:
 		change_state(State.HURT)
 
-func apply_knockback(knockback: Vector2):
-	knockback_velocity = knockback * (1.0 - knockback_resistance)
+func apply_knockback(force_vector: Vector2) -> void:
+	knockback_velocity = force_vector
+	# 考慮是否在此處轉換到 HURT 狀態
+	# if current_state != State.HURT and current_state != State.DIE and not is_frozen:
+	# 	change_state(State.HURT)
 #endregion
 
 #region 信號處理

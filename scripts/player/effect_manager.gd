@@ -90,23 +90,25 @@ func play_double_jump(flip_h: bool = false) -> void:
 	effect_position.y += 80
 	effect_instance.global_position = effect_position
 	
-	var player = get_parent()
-	if player and player.has_jump_impact:
-		var tween = create_tween()
-		tween.set_parallel(true)
-		tween.set_trans(Tween.TRANS_SINE)
-		tween.set_ease(Tween.EASE_OUT)
-		
-		var start_scale = Vector2(0.5, 0.5)
-		var max_scale = Vector2(1.5, 1.5)
-		var max_distance = 60.0
-		
-		effect_instance.scale = start_scale
-		
-		tween.tween_property(effect_instance, "scale", max_scale, 0.8)
-		tween.tween_property(effect_instance, "global_position:y", effect_position.y + max_distance, 1.5)
-	else:
-		effect_instance.scale = Vector2(1.0, 1.0)
+	# 移除對 player.has_jump_impact 的檢查，因為該功能已刪除
+	# var player = get_parent()
+	# if player and player.has_jump_impact:
+	# 	var tween = create_tween()
+	# 	tween.set_parallel(true)
+	# 	tween.set_trans(Tween.TRANS_SINE)
+	# 	tween.set_ease(Tween.EASE_OUT)
+	# 	
+	# 	var start_scale = Vector2(0.5, 0.5)
+	# 	var max_scale = Vector2(1.5, 1.5)
+	# 	var max_distance = 60.0
+	# 	
+	# 	effect_instance.scale = start_scale
+	# 	
+	# 	tween.tween_property(effect_instance, "scale", max_scale, 0.8)
+	# 	tween.tween_property(effect_instance, "global_position:y", effect_position.y + max_distance, 1.5)
+	# else:
+	# 	# 總是使用普通縮放，因為 jump_impact 已移除
+	effect_instance.scale = Vector2(1.0, 1.0)
 	
 	_play_effect_animation(effect_instance, "smoke")
 

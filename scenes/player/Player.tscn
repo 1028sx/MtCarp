@@ -1,4 +1,4 @@
-[gd_scene load_steps=188 format=3 uid="uid://b2q5462bdb0q2"]
+[gd_scene load_steps=189 format=3 uid="uid://b2q5462bdb0q2"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_b51by"]
 [ext_resource type="Texture2D" uid="uid://cyr1632llp4qs" path="res://assets/players/Sprites/DASH.png" id="2_egfxe"]
@@ -36,6 +36,7 @@
 [ext_resource type="Script" path="res://addons/MetroidvaniaSystem/Scripts/MetroidvaniaSystem.gd" id="27_vq02x"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Hurt.gd" id="34_pa3c0"]
 [ext_resource type="Script" path="res://scripts/player/states/State_WallSlide.gd" id="35_h76fr"]
+[ext_resource type="Script" path="res://scripts/player/states/State_GroundSlam.gd" id="36_bu6a7"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pwo0r"]
 radius = 8.5
@@ -712,8 +713,8 @@ animations = [{
 }]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_a6pnd"]
-radius = 17.0
-height = 70.0
+radius = 5.0
+height = 130.0
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_a3ls5"]
 radius = 25.0
@@ -1168,13 +1169,12 @@ scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_pdjgy")
 animation = &"idle"
 
-[node name="JumpImpactArea" type="Area2D" parent="."]
-collision_layer = 8
-collision_mask = 128
+[node name="GroundSlamArea" type="Area2D" parent="."]
+collision_layer = 128
+collision_mask = 8
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="JumpImpactArea"]
-visible = false
-position = Vector2(-2, 84)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="GroundSlamArea"]
+position = Vector2(-1, 68)
 rotation = 1.5708
 shape = SubResource("CapsuleShape2D_a6pnd")
 
@@ -1188,11 +1188,11 @@ position = Vector2(-2, 38)
 shape = SubResource("CapsuleShape2D_a6pnd")
 
 [node name="AttackArea" type="Area2D" parent="."]
+visible = false
 collision_layer = 128
 collision_mask = 8
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="AttackArea"]
-visible = false
 polygon = PackedVector2Array(-37, -2, 1, 66, 96, 72, 90, 26, 46, -6)
 
 [node name="SpecialAttackArea" type="Area2D" parent="."]
@@ -1273,9 +1273,10 @@ special_attack_state = NodePath("../SpecialAttack")
 dash_state = NodePath("../Dash")
 wall_slide_state = NodePath("../WallSlide")
 
-[node name="Dash" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "attack_state")]
+[node name="Dash" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "fall_state", "attack_state")]
 script = ExtResource("24_8sbic")
 idle_state = NodePath("../Idle")
+fall_state = NodePath("../Fall")
 attack_state = NodePath("../Attack")
 
 [node name="Attack" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "fall_state", "move_state", "jump_state", "dash_state")]
@@ -1307,6 +1308,9 @@ script = ExtResource("35_h76fr")
 fall_state = NodePath("../Fall")
 jump_state = NodePath("../Jump")
 idle_state = NodePath("../Idle")
+
+[node name="GroundSlam" type="Node" parent="StateMachine"]
+script = ExtResource("36_bu6a7")
 
 [node name="MetroidvaniaSystem" type="Node" parent="."]
 script = ExtResource("27_vq02x")

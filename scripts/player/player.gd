@@ -17,7 +17,7 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @export var speed = 200.0
 @export var jump_velocity = -450.0
 @export var max_jumps = 2
-@export var jump_buffer_time = 0.1
+@export var jump_buffer_time = 0.2
 @export var coyote_time = 0.1
 
 @export_group("Dash")
@@ -57,11 +57,11 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @onready var effect_manager = $EffectManager
 @onready var special_attack_area = $SpecialAttackArea
 @onready var camera = $Camera2D
-@onready var jump_impact_area = $JumpImpactArea
 @onready var state_machine = $StateMachine
 @onready var metsys_node = $MetroidvaniaSystem
 @onready var wall_check_left: RayCast2D = $WallCheckLeft
 @onready var wall_check_right: RayCast2D = $WallCheckRight
+@onready var ground_slam_area: Area2D
 
 var shuriken_scene = preload("res://scenes/player/shuriken.tscn")
 var wave_scene = preload("res://scenes/player/dash_wave.tscn")
@@ -111,7 +111,6 @@ var active_effects := {}
 var knockback_velocity := Vector2.ZERO
 
 var has_dash_wave := false
-var has_jump_impact := false
 
 var is_charging := false
 var charge_time := 0.0
@@ -142,6 +141,11 @@ var rage_stack_limit := 5
 var rage_damage_bonus := 0.1
 
 var wall_jump_cooldown_timer := 0.0
+
+var can_perform_ground_slam := false
+const GROUND_SLAM_SPEED := 600.0
+const GROUND_SLAM_DAMAGE_MULTIPLIER := 3.0
+const GROUND_SLAM_KNOCKBACK_FORCE := 150.0
 
 signal health_changed(new_health: int)
 signal player_killed_enemy
@@ -195,19 +199,21 @@ func _physics_process(delta: float) -> void:
 	_update_global_timers(delta)
 
 	var on_floor = is_on_floor()
-	if on_floor and not was_on_floor:
+
+	if state_machine and state_machine.current_state: 
+		state_machine._physics_process(delta)
+	else:
+		printerr("[Player] Error: Invalid State Machine or Current State in _physics_process!")
+
+	_handle_ground_slam_input()
+
+	var current_on_floor = is_on_floor()
+	if current_on_floor and not was_on_floor:
 		_on_landed()
-	was_on_floor = on_floor
+	was_on_floor = current_on_floor
 
 	if metsys_node:
 		metsys_node.set_player_position(global_position)
-
-	if state_machine and state_machine.current_state:
-		state_machine._physics_process(delta)
-	else:
-		if not is_on_floor():
-			velocity.y += gravity * delta
-		move_and_slide()
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("jump"):
@@ -247,13 +253,6 @@ func _setup_collisions() -> void:
 		
 		special_attack_area.set_collision_layer_value(4, true)
 		special_attack_area.set_collision_mask_value(3, true)
-
-	if jump_impact_area:
-		jump_impact_area.collision_layer = 0
-		jump_impact_area.collision_mask = 0
-		jump_impact_area.set_collision_mask_value(3, true)
-		jump_impact_area.monitoring = false
-		jump_impact_area.monitorable = true
 
 func _connect_signals() -> void:
 	if animated_sprite:
@@ -349,53 +348,96 @@ func _adjust_camera_zoom(delta_zoom: float) -> void:
 
 #region 戰鬥系統 (受傷和死亡)
 func take_damage(amount: float, attacker: Node = null) -> void:
+	# 1. Check for full invincibility (Dash or general invincible flag)
 	if is_invincible or (state_machine and state_machine.current_state is State_Dash):
-		return
-		
+		print("[Player_take_damage] Damage ignored due to invincibility or Dash state.")
+		return # No damage, no effects, no interruption
+
+	# 2. Apply damage
+	var previous_health = current_health
 	current_health -= amount
+	print("[Player_take_damage] Health changed from %s to %s (Damage: %s)" % [previous_health, current_health, amount])
+	
+	# 3. Emit health signal
 	health_changed.emit(current_health)
 	
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager:
-		game_manager.reset_combo()
-	
-	if active_effects.has("rage") and rage_stack < rage_stack_limit:
-		rage_stack += 1
-		_update_rage_damage()
-	
+	# 4. Apply unconditional on-hit effects (apply regardless of interruption)
+	# Example: Thorns damage back to attacker
 	if active_effects.has("thorns") and attacker != null:
 		var real_attacker = attacker
 		if attacker.has_method("get_shooter"):
 			real_attacker = attacker.get_shooter()
 		if real_attacker != null and real_attacker.has_method("take_damage"):
-			real_attacker.take_damage(amount * 5.0)
+			# 注意：避免無限遞迴，Thorns 傷害不應觸發 Thorns
+			# 可以傳遞一個標誌，或者確保 Thorns 傷害源不同
+			print("[Player_take_damage] Applying Thorns damage back.")
+			real_attacker.call("take_damage", amount * 5.0) # 假設傷害倍數是 5.0
 	
+	# Example: Gain Rage stack on taking damage
+	if active_effects.has("rage") and rage_stack < rage_stack_limit:
+		rage_stack += 1
+		_update_rage_damage()
+		print("[Player_take_damage] Rage stack increased to: %s" % rage_stack)
+
+	# 5. Check for death
 	if current_health <= 0:
 		if has_revive_heart:
 			has_revive_heart = false
-			current_health = float(max_health) / 2.0
+			current_health = float(max_health) / 2.0 # Restore half health
 			health_changed.emit(current_health)
 			var ui = get_tree().get_first_node_in_group("ui")
 			if ui and ui.has_method("use_revive_heart"):
 				ui.use_revive_heart()
-			set_invincible(2.0)
+			set_invincible(2.0) # Grant invincibility after revive
+			print("[Player_take_damage] Player Revived! Granted 2s invincibility.")
+			# 考慮是否需要強制轉換狀態，例如回到 Idle 或 Fall
+			# if state_machine and state_machine.states.has("idle"): 
+			#    state_machine._transition_to(state_machine.states["idle"])
 		else:
-			if state_machine and state_machine.states.has("hurt"):
-				state_machine._transition_to(state_machine.states["hurt"])
-			else:
-				
-				set_physics_process(false)
-				set_process_input(false)
-				died.emit()
-	else:
+			# Actual Death
+			print("[Player_take_damage] Player Died!")
+			set_physics_process(false) # Stop player physics
+			set_process_input(false) # Stop player input
+			# 可以添加死亡視覺效果，例如動畫停止、變灰等
+			if animated_sprite: animated_sprite.stop()
+			died.emit() # Signal that player died
+		return # Stop further processing after death/revive
+
+	# 6. Handle interruption vs Super Armor (only if not dead and not invincible/dashing)
+	var has_super_armor = false
+	# 檢查當前狀態是否提供霸體 (目前只有 SpecialAttack)
+	if state_machine and state_machine.current_state is State_Special_Attack:
+		has_super_armor = true
+
+	if not has_super_armor:
+		# --- Interruption Logic --- (沒有霸體，正常受傷反應)
+		print("[Player_take_damage] Interrupted (No Super Armor)!")
+
+		# 重置連擊 (如果需要)
+		var game_manager = get_tree().get_first_node_in_group("game_manager")
+		if game_manager and game_manager.has_method("reset_combo"): # Assuming GameManager handles combo
+			game_manager.reset_combo() 
+
+		# 轉換到 Hurt 狀態
 		if state_machine and state_machine.states.has("hurt"):
 			state_machine._transition_to(state_machine.states["hurt"])
 		else:
-			
-			set_invincible(invincible_duration)
-	
-	last_jump_was_wall_jump = false
-	is_double_jumping_after_wall_jump = false
+			printerr("[Player_take_damage] Hurt state not found!")
+
+		# 重置因被打斷而應取消的狀態或能力
+		print("[Player_take_damage] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
+		last_jump_was_wall_jump = false
+		is_double_jumping_after_wall_jump = false
+		set_can_ground_slam(false) # 只有在被打斷時才取消地面衝擊能力
+		reset_charge_state() # 只有在被打斷時才取消蓄力
+
+	else:
+		# --- Super Armor Logic --- (有霸體)
+		print("[Player_take_damage] Super Armor absorbed interruption!")
+		# 不轉換到 Hurt 狀態
+		# 不重置 can_perform_ground_slam
+		# 不重置 charge_state
+		# 不重置 combo (取決於你的設計，但通常霸體不重置連擊)
 
 func set_invincible(duration: float) -> void:
 	if duration > 0:
@@ -484,10 +526,12 @@ func _update_cooldowns(delta: float) -> void:
 			can_special_attack = true
 
 func _on_landed() -> void:
+	print("[Player_on_landed] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
 	jump_count = 0
 	coyote_timer = coyote_time
 	last_jump_was_wall_jump = false
 	is_double_jumping_after_wall_jump = false
+	set_can_ground_slam(false)
 
 func get_knockback_force() -> float:
 	var force = 100.0
@@ -568,11 +612,6 @@ func apply_effect(effect: Dictionary) -> void:
 		"dash_wave":
 			active_effects["dash_wave"] = true
 			has_dash_wave = true
-			
-		"jump_impact":
-			active_effects["jump_impact"] = true
-			has_jump_impact = true
-			max_jumps = 3
 			
 		"charge_attack_movement":
 			active_effects["charge_attack_movement"] = true
@@ -688,7 +727,6 @@ func reset_all_states() -> void:
 		remove_swift_dash()
 	active_effects.clear()
 	has_dash_wave = false
-	has_jump_impact = false
 	max_jumps = 2
 	
 	reset_move_speed()
@@ -783,82 +821,9 @@ func _handle_jump() -> void:
 		if is_on_floor():
 			velocity.y = -JUMP_VELOCITY
 			jump_count = 1
-			if has_jump_impact:
-				_create_jump_impact()
 		elif jump_count < max_jumps:
 			velocity.y = -JUMP_VELOCITY * 1.2
 			jump_count += 1
-			if has_jump_impact:
-				_create_jump_impact(jump_count > 2)
-
-func _create_jump_impact(is_double_jump: bool = false) -> void:
-	if not effect_manager or not jump_impact_area:
-		return
-	
-	hit_enemies.clear()
-	
-	var start_scale = Vector2(0.5, 0.5)
-	var max_scale = Vector2(2.0, 2.0) if is_double_jump else Vector2(1.5, 1.5)
-	var start_position = Vector2.ZERO
-	var max_distance = 100.0 if is_double_jump else 60.0
-	
-	jump_impact_area.scale = start_scale
-	jump_impact_area.position = start_position
-	jump_impact_area.monitoring = true
-	
-	await get_tree().physics_frame
-	
-	var tween = create_tween()
-	tween.set_parallel(true)
-	tween.set_trans(Tween.TRANS_SINE)
-	tween.set_ease(Tween.EASE_OUT)
-	
-	tween.tween_property(jump_impact_area, "scale", max_scale, 0.5)
-	
-	effect_manager.play_double_jump(animated_sprite.flip_h)
-	
-	var current_distance = 0.0
-	var step = max_distance / 20.0
-	
-	for i in range(20):
-		if not jump_impact_area.monitoring:
-			jump_impact_area.monitoring = true
-			await get_tree().physics_frame
-			continue
-		
-		var space_state = get_world_2d().direct_space_state
-		var query = PhysicsRayQueryParameters2D.create(
-			jump_impact_area.global_position,
-			jump_impact_area.global_position + Vector2(0, step),
-			1
-		)
-		var result = space_state.intersect_ray(query)
-		
-		if not result:
-			current_distance += step
-			jump_impact_area.position.y = current_distance
-		
-		var areas = jump_impact_area.get_overlapping_areas()
-		for area in areas:
-			var enemy = area.get_parent()
-			if enemy.is_in_group("enemy") and not hit_enemies.has(enemy):
-				hit_enemies.append(enemy)
-				
-				var damage = current_attack_damage * (2.0 if is_double_jump else 1.0)
-				enemy.take_damage(damage)
-				
-				if enemy.has_method("apply_knockback"):
-					var direction = Vector2.UP + (Vector2.RIGHT if enemy.global_position.x > global_position.x else Vector2.LEFT)
-					var force = Vector2(2000, -800) if is_double_jump else Vector2(1000, -400)
-					enemy.apply_knockback(direction.normalized() * force)
-		
-		await get_tree().physics_frame
-	
-	await tween.finished
-	
-	jump_impact_area.monitoring = false
-	jump_impact_area.scale = Vector2.ONE
-	jump_impact_area.position = Vector2.ZERO
 
 func boost_move_speed(multiplier: float) -> void:
 	speed *= multiplier
@@ -968,3 +933,26 @@ func restore_lives() -> void:
 	var ui = get_tree().get_first_node_in_group("ui")
 	if ui and ui.has_method("restore_revive_heart"):
 		ui.restore_revive_heart()
+
+func _handle_ground_slam_input() -> void:
+	if Input.is_action_just_pressed("ground_slam"):
+		# print(f"[Player] Ground Slam Input: can_perform={can_perform_ground_slam}, not_on_floor={not is_on_floor()}, state={state_machine.current_state.name if state_machine and state_machine.current_state else 'N/A'}")
+		print("[Player] Ground Slam Input: can_perform=%s, not_on_floor=%s, state=%s" % [can_perform_ground_slam, not is_on_floor(), state_machine.current_state.name if state_machine and state_machine.current_state else "N/A"])
+		
+		if can_perform_ground_slam and not is_on_floor():
+			if state_machine:
+				if state_machine.states.has("groundslam"): 
+					print("[Player] Attempting transition to 'groundslam' state.")
+					state_machine._transition_to(state_machine.states["groundslam"])
+				else:
+					printerr("[Player] Error: 'groundslam' state not found in StateMachine states dictionary!")
+			else:
+				printerr("[Player] Error: StateMachine node not found!")
+
+# Setter function for can_perform_ground_slam with logging
+func set_can_ground_slam(value: bool) -> void:
+	if can_perform_ground_slam != value: 
+		var old_value = can_perform_ground_slam
+		can_perform_ground_slam = value
+		# print(f"[Player_set_can_ground_slam] Value changed from {old_value} to {can_perform_ground_slam}. Caller: {get_stack()[1] if get_stack().size() > 1 else 'Unknown'}")
+		print("[Player_set_can_ground_slam] Value changed from %s to %s. Caller: %s" % [old_value, can_perform_ground_slam, get_stack()[1] if get_stack().size() > 1 else "Unknown"])

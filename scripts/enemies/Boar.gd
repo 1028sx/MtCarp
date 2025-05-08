@@ -274,8 +274,11 @@ func take_damage(amount):
 	else:
 		change_state(State.HURT)
 
-func apply_knockback(knockback: Vector2):
-	knockback_velocity = knockback * (1.0 - knockback_resistance)
+func apply_knockback(force_vector: Vector2) -> void:
+	knockback_velocity = force_vector
+	# 可以選擇是否在這裡立即改變狀態到 HURT，或者讓 take_damage 處理
+	# if current_state != State.HURT and current_state != State.DIE:
+	# 	change_state(State.HURT)
 
 func _on_animated_sprite_animation_finished():
 	if current_state == State.HURT:
