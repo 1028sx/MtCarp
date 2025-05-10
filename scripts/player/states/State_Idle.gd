@@ -1,4 +1,3 @@
-# scripts/player/states/State_Idle.gd
 class_name State_Idle
 extends PlayerState
 
@@ -28,28 +27,22 @@ func get_transition() -> PlayerState:
 		return fall_state
 	
 	if Input.is_action_just_pressed("jump"):
-		print("[Idle -> Jump] Condition met")
 		return jump_state
 	
 	var direction = Input.get_axis("move_left", "move_right")
 	if direction != 0:
-		print("[Idle -> Move] Condition met")
 		return move_state
 
 	if Input.is_action_just_pressed("attack") and attack_state:
-		print("[Idle -> Attack] Condition met")
 		return attack_state
 
 	if Input.is_action_just_pressed("special_attack") and player.can_special_attack:
 		var sa_state = state_machine.states.get("specialattack")
 		if sa_state:
-			print("[Idle -> SpecialAttack] Condition met")
 			return sa_state
-		else:
-			printerr("特殊攻擊狀態節點 (specialattack) 未在狀態機中找到！")
+
 
 	if Input.is_action_just_pressed("dash") and dash_state and player.can_dash and player.dash_cooldown_timer <= 0:
-		print("[Idle -> Dash] Condition met")
 		return dash_state
 
 	return null 

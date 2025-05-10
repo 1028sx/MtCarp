@@ -352,7 +352,7 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 	if is_invincible or (state_machine and state_machine.current_state is State_Dash):
 		print("[Player_take_damage] Damage ignored due to invincibility or Dash state.")
 		return # No damage, no effects, no interruption
-
+		
 	# 2. Apply damage
 	var previous_health = current_health
 	current_health -= amount
@@ -423,14 +423,13 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 			state_machine._transition_to(state_machine.states["hurt"])
 		else:
 			printerr("[Player_take_damage] Hurt state not found!")
-
+			
 		# 重置因被打斷而應取消的狀態或能力
 		print("[Player_take_damage] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
 		last_jump_was_wall_jump = false
 		is_double_jumping_after_wall_jump = false
 		set_can_ground_slam(false) # 只有在被打斷時才取消地面衝擊能力
 		reset_charge_state() # 只有在被打斷時才取消蓄力
-
 	else:
 		# --- Super Armor Logic --- (有霸體)
 		print("[Player_take_damage] Super Armor absorbed interruption!")

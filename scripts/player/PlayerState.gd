@@ -5,7 +5,7 @@ extends Node
 # 讓狀態可以訪問玩家節點及其屬性
 var player: CharacterBody2D
 # 讓狀態可以訪問狀態機本身 (用於觸發狀態轉換)
-var state_machine # PlayerStateMachine (避免循環引用，使用類型提示)
+var state_machine
 
 # 狀態名稱 (可選，用於調試)
 var state_name := "PlayerState"
