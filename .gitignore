@@ -44,3 +44,6 @@ export_presets.cfg
 
 # Asset Store content (optional, if you want to re-download)
 # addons/
+
+# 原始README檔案（包含敏感資訊）
+ORIGINAL_README.md
