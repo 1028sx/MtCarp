@@ -2,8 +2,10 @@ extends CharacterBody2D
 
 signal defeated
 signal phase_changed(phase: int)
-signal health_changed(new_health: int)
+signal health_changed(current: float, max_health: float)
 signal boss_appeared
+
+signal boss_defeated
 
 #region 導出屬性
 @export_group("Movement")
@@ -11,6 +13,7 @@ signal boss_appeared
 @export var jump_force = -450.0
 
 @export_group("Combat")
+@export var max_health = 1000  # 添加最大生命值變數
 @export var health = 1000
 @export var damage = 30
 @export var knockback_resistance = 0.95
@@ -64,6 +67,7 @@ var current_phase = Phase.ONE
 var is_dying = false
 var has_jumped = false  
 var is_performing_ranged = false  
+var current_health = 1000  # 添加current_health屬性以兼容BossUI
 
 var active_spirits = []  # 當前存活的精靈
 var available_colors = []  # 可用顏色
@@ -87,6 +91,15 @@ var jump_attempt_count = 0  # 跳躍嘗試次數
 
 #region 初始化
 func _ready():
+	# 確保將自己添加到boss組
+	if not is_in_group("boss"):
+		add_to_group("boss")
+		print("[Boss] 已添加到boss組")
+	
+	# 確保健康值等於最大健康值
+	health = max_health
+	current_health = max_health  # 同步current_health值
+	
 	_initialize_boss()
 	_setup_collisions()
 	_setup_timer()
@@ -106,10 +119,23 @@ func _ready():
 	available_colors = SPIRIT_COLORS.duplicate()
 	
 	await get_tree().process_frame
+	# 發出初始信號
 	boss_appeared.emit()
+	# 發出初始階段信號，確保UI顯示
+	phase_changed.emit(Phase.ONE)
+	print("[Boss] 發出phase_changed信號，階段：Phase.ONE (", Phase.ONE, ")")
+	# 發出初始血量信號
+	health_changed.emit(current_health, max_health)
+	print("[Boss] 發出health_changed信號，血量：", current_health, "/", max_health)
+	
+	# 嘗試查找並連接BossUI
+	var boss_ui = get_tree().get_first_node_in_group("boss_ui")
+	if boss_ui:
+		print("[Boss] 找到BossUI節點，路徑：", boss_ui.get_path())
+	else:
+		print("[Boss] 警告：未找到BossUI節點，UI可能無法正確顯示")
 
 func _initialize_boss():
-	add_to_group("boss")
 	if animated_sprite:
 		animated_sprite.play("idle")
 
@@ -214,7 +240,9 @@ func _handle_state(delta):
 			die_state()
 
 func _check_phase_transition():
-	if current_phase == Phase.ONE and health <= 500:  # 直接使用固定值
+	# 如果目前是第一階段，且血量低於或等於500（血量上限的一半），則進入第二階段
+	if current_phase == Phase.ONE and health <= max_health * 0.5:
+		print("[Boss] 血量降至一半 (", health, "/", max_health, ")，進入第二階段")
 		enter_phase_two()
 #endregion
 
@@ -363,7 +391,7 @@ func die_state():
 	if not is_dying and animated_sprite:
 		is_dying = true
 		animated_sprite.play("die")
-		defeated.emit()
+		boss_defeated.emit()
 
 # 修改攻擊判定函數
 func apply_attack_damage():
@@ -514,7 +542,7 @@ func change_state(new_state: State) -> void:
 			if not is_dying and animated_sprite:
 				is_dying = true
 				animated_sprite.play("die")
-				defeated.emit()
+				boss_defeated.emit()
 #endregion
 
 #region 第二階段
@@ -641,7 +669,8 @@ func spawn_spirit():
 	active_spirits.append(spirit)
 	
 	# 連接信號
-	spirit.defeated.connect(_on_spirit_defeated.bind(spirit, spirit_color))
+	if spirit.has_signal("defeated"):
+		spirit.defeated.connect(_on_spirit_defeated.bind(spirit, spirit_color))
 
 func _on_spirit_defeated(spirit, color):
 	active_spirits.erase(spirit)
@@ -672,7 +701,8 @@ func take_damage(amount: int):
 		return
 		
 	health -= amount
-	health_changed.emit(health)
+	current_health = health  # 同步current_health
+	health_changed.emit(health, max_health)  # 修改：同時傳遞目前血量和最大血量
 	
 	hit_count += 1
 	
@@ -710,21 +740,54 @@ func die():
 		game_manager.enemy_killed()
 	
 	# 發送死亡信號
-	defeated.emit()
+	boss_defeated.emit()  # 修改：使用boss_defeated信號代替defeated
 
 func _on_hitbox_area_entered(area: Area2D) -> void:
 	if area.get_collision_layer_value(4):  # 檢查是否是攻擊區域
 		var parent = area.get_parent()
 		if parent.is_in_group("player"):
+			# 檢查這是否是活躍的攻擊區域，而不是僅僅接觸到了區域
+			var is_real_attack = false
 			var damage_amount = 0
 			
-			if parent.is_attacking:
-				damage_amount = parent.get_attack_damage()
-			elif parent.is_special_attacking:
-				damage_amount = parent.SPECIAL_ATTACK_DAMAGE
-				
-			if damage_amount > 0:
+			# 進階檢查：攻擊區域是否處於激活狀態
+			if not area.monitoring:
+				return  # 攻擊區域未激活，直接返回
+			
+			# 方法1：檢查普通攻擊
+			if area.name == "AttackArea":
+				# 檢查玩家當前狀態名稱
+				if parent.state_machine and parent.state_machine.current_state:
+					var state_name = parent.state_machine.current_state.name.to_lower()
+					# 嚴格檢查：必須包含"attack"且不是"dashing"或其他非攻擊狀態
+					if "attack" in state_name and not "dash" in state_name:
+						is_real_attack = true
+						# 獲取普通攻擊傷害
+						if parent.has_method("get_attack_damage"):
+							damage_amount = parent.get_attack_damage()
+						elif "current_attack_damage" in parent:
+							damage_amount = parent.current_attack_damage
+						else:
+							damage_amount = 20  # 預設傷害值
+			
+			# 方法2：檢查特殊攻擊
+			elif area.name == "SpecialAttackArea":
+				if parent.state_machine and parent.state_machine.current_state:
+					var state_name = parent.state_machine.current_state.name.to_lower()
+					if "special" in state_name or "slam" in state_name:
+						is_real_attack = true
+						# 獲取特殊攻擊傷害
+						if parent.has_method("get_special_attack_damage"):
+							damage_amount = parent.get_special_attack_damage()
+						elif "current_special_attack_damage" in parent:
+							damage_amount = parent.current_special_attack_damage
+						else:
+							damage_amount = 40  # 預設特殊攻擊傷害值
+			
+			# 只有當確認是真實攻擊且造成有效傷害時，才應用傷害
+			if is_real_attack and damage_amount > 0:
 				take_damage(damage_amount)
+				print("Boss受到玩家攻擊，傷害值:", damage_amount, " 攻擊區域:", area.name, " 狀態:", parent.state_machine.current_state.name)
 
 func jump_state():
 	if is_on_floor() and not has_jumped:  # 有在地面且還沒跳過時才跳躍
@@ -770,4 +833,11 @@ func _on_attack_area_area_entered(area: Area2D):
 
 func _on_attack_area_body_entered(_body: Node2D):
 	pass
+
+# 添加getter方法以兼容BossUI
+func get_current_health() -> float:
+	return current_health
+
+func get_max_health() -> float:
+	return max_health
 #endregion 

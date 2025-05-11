@@ -7,6 +7,9 @@ extends Node2D
 @onready var ui = preload("res://scenes/ui/UI.tscn").instantiate()
 @onready var loot_selection_ui = preload("res://scenes/ui/loot_selection_ui.tscn")
 @onready var game_manager = preload("res://scenes/managers/GameManager.tscn").instantiate()
+# 不在@onready中實例化boss_ui，改為僅預加載場景
+var boss_ui_scene = preload("res://scenes/enemies/boss_ui.tscn")
+var boss_ui = null
 
 func _get_room_manager() -> Node:
 	return get_node("/root/RoomManager")
@@ -65,6 +68,75 @@ func _ready():
 		game_manager.add_to_group("game_manager")
 	
 	add_child(ui)
+	
+	# 添加Boss UI - 改進的加載流程
+	print("[Main] 開始加載BossUI")
+
+	# 首先檢查是否有autoload的BossUI實例
+	var autoload_boss_ui = get_node_or_null("/root/BossUI")
+	if autoload_boss_ui:
+		push_warning("[Main] 警告：BossUI被配置為自動加載(autoload)，這可能導致UI顯示問題")
+		push_warning("[Main] 建議：從project.godot中移除BossUI的autoload配置")
+		print("[Main] 嘗試處理autoload的BossUI")
+		# 可以選擇將autoload的實例從場景中移除
+		# 注意：這可能在運行時導致錯誤，最好的做法是修改project.godot
+		if autoload_boss_ui.get_parent():
+			autoload_boss_ui.get_parent().remove_child(autoload_boss_ui)
+			autoload_boss_ui.queue_free()
+			await get_tree().process_frame
+
+	var existing_boss_ui = get_tree().get_first_node_in_group("boss_ui")
+	if existing_boss_ui:
+		print("[Main] 發現已存在的BossUI節點")
+		boss_ui = existing_boss_ui
+		
+		# 檢查BossUI的父節點是否正確
+		if boss_ui.get_parent() != self:
+			print("[Main] 警告：BossUI的父節點不是Main，正在修正")
+			if boss_ui.get_parent():
+				boss_ui.get_parent().remove_child(boss_ui)
+			add_child(boss_ui)
+			print("[Main] 已修正BossUI的父節點")
+		
+		# 檢查現有BossUI的結構
+		var control_hud = boss_ui.get_node_or_null("Control_BossHUD")
+		if not control_hud:
+			push_error("[Main] 錯誤：現有BossUI缺少Control_BossHUD節點")
+			# 嘗試刪除並重新創建
+			boss_ui.queue_free()
+			await get_tree().process_frame
+			boss_ui = boss_ui_scene.instantiate()
+			add_child(boss_ui)
+			print("[Main] 已刪除損壞的BossUI並重新創建")
+		
+	else:
+		print("[Main] 創建新的BossUI")
+		boss_ui = boss_ui_scene.instantiate()
+		
+		# 確保boss_ui已添加到場景
+		add_child(boss_ui)
+		# 必須先添加到場景，再能執行節點檢查
+		await get_tree().process_frame
+		
+		# 檢查boss_ui節點結構
+		print("[Main] 檢查BossUI節點結構")
+		var control_hud = boss_ui.get_node_or_null("Control_BossHUD")
+		if control_hud:
+			print("[Main] 找到Control_BossHUD節點")
+			var texture_progress = control_hud.get_node_or_null("TextureProgressBar_BossHP")
+			if texture_progress:
+				print("[Main] 找到TextureProgressBar_BossHP節點")
+			else:
+				push_error("[Main] 錯誤：BossUI場景中未找到TextureProgressBar_BossHP節點")
+		else:
+			push_error("[Main] 錯誤：BossUI場景中未找到Control_BossHUD節點")
+		
+		print("[Main] BossUI已添加到場景")
+		
+		# 確保BossUI已添加到boss_ui組
+		if not boss_ui.is_in_group("boss_ui"):
+			boss_ui.add_to_group("boss_ui")
+			print("[Main] BossUI已添加到boss_ui組")
 	
 	var new_loot_selection_ui = loot_selection_ui.instantiate()
 	add_child(new_loot_selection_ui)
