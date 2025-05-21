@@ -25,6 +25,4 @@ position_smoothing_enabled = true
 
 [node name="CanvasLayer(UI)" parent="." instance=ExtResource("6_r5clf")]
 
-[connection signal="gold_changed" from="Player" to="CanvasLayer(UI)" method="update_gold"]
 [connection signal="health_changed" from="Player" to="." method="_on_player_health_changed"]
-[connection signal="health_changed" from="Player" to="CanvasLayer(UI)" method="_on_player_health_changed"]

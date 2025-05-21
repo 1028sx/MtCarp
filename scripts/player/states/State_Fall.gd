@@ -44,8 +44,7 @@ func get_transition() -> PlayerState:
 	if player.jump_buffer_timer > 0 and player.jump_count < player.max_jumps:
 		if jump_state is State_Jump:
 			(jump_state as State_Jump).came_from_air_state = true
-		else:
-			push_error("FallState: jump_state is not of type State_Jump! Ensure jump_state is correctly exported and assigned in the editor for FallState.")
+		
 		return jump_state
 	
 	if Input.is_action_just_pressed("attack") and attack_state:

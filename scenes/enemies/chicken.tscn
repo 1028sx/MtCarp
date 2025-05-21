@@ -342,6 +342,8 @@ radius = 19.0
 height = 48.0
 
 [node name="chicken" type="CharacterBody2D" groups=["enemy"]]
+collision_layer = 4
+collision_mask = 3
 script = ExtResource("1_6v8xf")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
@@ -354,17 +356,23 @@ rotation = 1.5708
 shape = SubResource("CapsuleShape2D_46xi6")
 
 [node name="DetectionArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
 
 [node name="CircleShape2D" type="CollisionShape2D" parent="DetectionArea"]
 shape = SubResource("CircleShape2D_htx4c")
 
-[node name="AttackArea" type="Area2D" parent="."]
+[node name="AttackArea" type="Area2D" parent="." groups=["enemy"]]
+collision_layer = 64
+collision_mask = 8
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea"]
 position = Vector2(-6, -3)
 shape = SubResource("CircleShape2D_vqsbp")
 
 [node name="Hitbox" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 32
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
 rotation = 1.5708

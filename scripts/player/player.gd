@@ -148,10 +148,10 @@ const GROUND_SLAM_DAMAGE_MULTIPLIER := 3.0
 const GROUND_SLAM_KNOCKBACK_FORCE := 150.0
 
 signal health_changed(new_health: int)
-signal player_killed_enemy
 signal died
 signal gold_changed(new_gold: int)
 
+# warning-ignore:unused_signal
 signal effect_changed(effects: Dictionary)
 
 var agile_perfect_dodge := false
@@ -192,13 +192,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
-
 	if _handle_camera_mode(delta):
 		return
 		
 	_update_global_timers(delta)
-
-	var on_floor = is_on_floor()
 
 	if state_machine and state_machine.current_state: 
 		state_machine._physics_process(delta)
@@ -235,24 +232,34 @@ func _initialize_player() -> void:
 	gold = 0
 
 func _setup_collisions() -> void:
-	set_collision_layer_value(2, true)
-	set_collision_mask_value(1, true)
+	# set_collision_layer_value(2, true)  # Player layer
+	# set_collision_mask_value(1, true)   # Detect Environment
 	
-	var hitbox = $Hitbox
-	if hitbox:
-		hitbox.set_collision_layer_value(3, true)
-		hitbox.set_collision_mask_value(4, true)
+	# var hitbox = $Hitbox
+	# if hitbox:
+		# hitbox.set_collision_layer_value(3, true) # PlayerHitbox layer (assuming layer 3 is PlayerHitbox)
+		# hitbox.set_collision_mask_value(4, true)  # Detect EnemyAttack layer (assuming layer 4 is EnemyAttack)
 	
-	if attack_area:
-		attack_area.set_collision_layer_value(4, true)
-		attack_area.set_collision_mask_value(3, true)
+	# if attack_area:
+		# attack_area.set_collision_layer_value(4, true) # PlayerAttack layer (assuming layer 4 is PlayerAttack)
+		# attack_area.set_collision_mask_value(3, true)  # Detect EnemyHitbox layer (assuming layer 3 is EnemyHitbox)
 
-	if special_attack_area:
-		special_attack_area.collision_layer = 0
-		special_attack_area.collision_mask = 0
+	# if special_attack_area:
+		# special_attack_area.collision_layer = 0
+		# special_attack_area.collision_mask = 0
 		
-		special_attack_area.set_collision_layer_value(4, true)
-		special_attack_area.set_collision_mask_value(3, true)
+		# special_attack_area.set_collision_layer_value(4, true) # PlayerAttack layer
+		# special_attack_area.set_collision_mask_value(3, true)  # Detect EnemyHitbox layer
+		
+		# # 確保特殊攻擊區域預設為禁用狀態
+		# special_attack_area.monitoring = false
+		# special_attack_area.monitorable = false
+	
+	# ground_slam_area = $GroundSlamArea
+	# if ground_slam_area:
+		# ground_slam_area.monitoring = false
+		# ground_slam_area.monitorable = false
+	pass # 保留函數定義，但內容被註解掉
 
 func _connect_signals() -> void:
 	if animated_sprite:
@@ -348,6 +355,28 @@ func _adjust_camera_zoom(delta_zoom: float) -> void:
 
 #region 戰鬥系統 (受傷和死亡)
 func take_damage(amount: float, attacker: Node = null) -> void:
+	print("--------------------------------------------------")
+	print("[Player_take_damage] CALLED!")
+	print("- Timestamp: ", Time.get_ticks_msec())
+	print("- Damage Amount: ", amount)
+	if attacker:
+		print("- Attacker Name: ", attacker.name)
+		print("- Attacker Path: ", attacker.get_path())
+		print("- Attacker Type: ", attacker.get_class())
+		if attacker.owner and attacker.owner != attacker: # 避免重複打印自身
+			print("- Attacker Owner Name: ", attacker.owner.name)
+			print("- Attacker Owner Path: ", attacker.owner.get_path())
+			print("- Attacker Owner Type: ", attacker.owner.get_class())
+		print("- Attacker Global Position: ", str(attacker.global_position) if attacker is Node2D else "N/A (Attacker not Node2D)")
+		print("- Player Global Position: ", global_position)
+		print("- Distance to Attacker: ", str(global_position.distance_to(attacker.global_position)) if attacker is Node2D else "N/A")
+	else:
+		print("- Attacker: null (Damage might be environmental or self-inflicted)")
+	print("- Current Player State: ", String(state_machine.current_state.name) if state_machine and state_machine.current_state else "N/A")
+	print("- Is Invincible Flag: ", is_invincible)
+	print("- Is Dashing (State Check): ", str(state_machine.current_state is State_Dash) if state_machine and state_machine.current_state else "N/A")
+	print("--------------------------------------------------")
+
 	# 1. Check for full invincibility (Dash or general invincible flag)
 	if is_invincible or (state_machine and state_machine.current_state is State_Dash):
 		print("[Player_take_damage] Damage ignored due to invincibility or Dash state.")
@@ -398,8 +427,16 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 			print("[Player_take_damage] Player Died!")
 			set_physics_process(false) # Stop player physics
 			set_process_input(false) # Stop player input
-			# 可以添加死亡視覺效果，例如動畫停止、變灰等
-			if animated_sprite: animated_sprite.stop()
+			
+			# 轉換到死亡狀態
+			if state_machine and state_machine.states.has("dead"):
+				state_machine._transition_to(state_machine.states["dead"])
+			else:
+				printerr("[Player_take_damage] 錯誤：找不到死亡狀態！")
+				# 如果沒有死亡狀態，則默認處理
+				if animated_sprite: 
+					animated_sprite.stop()
+			
 			died.emit() # Signal that player died
 		return # Stop further processing after death/revive
 
@@ -559,10 +596,7 @@ func reset_charge_state() -> void:
 		if effect_manager:
 			effect_manager.stop_charge_effect()
 
-
-
 func get_raycast_wall_normal() -> Vector2:
-
 	if not is_node_ready() or not wall_check_left or not wall_check_right:
 		return Vector2.ZERO
 
@@ -570,11 +604,8 @@ func get_raycast_wall_normal() -> Vector2:
 	wall_check_right.force_raycast_update()
 
 	if wall_check_left.is_colliding():
-
 		return Vector2.RIGHT
 	elif wall_check_right.is_colliding():
-
-
 		return Vector2.LEFT
 
 	return Vector2.ZERO
@@ -936,17 +967,29 @@ func restore_lives() -> void:
 func _handle_ground_slam_input() -> void:
 	if Input.is_action_just_pressed("ground_slam"):
 		# print(f"[Player] Ground Slam Input: can_perform={can_perform_ground_slam}, not_on_floor={not is_on_floor()}, state={state_machine.current_state.name if state_machine and state_machine.current_state else 'N/A'}")
-		print("[Player] Ground Slam Input: can_perform=%s, not_on_floor=%s, state=%s" % [can_perform_ground_slam, not is_on_floor(), state_machine.current_state.name if state_machine and state_machine.current_state else "N/A"])
+		print("[Player] Ground Slam Input: can_perform=%s, not_on_floor=%s, state=%s, jump_count=%s, max_jumps=%s" % [
+			can_perform_ground_slam, 
+			not is_on_floor(), 
+			state_machine.current_state.name if state_machine and state_machine.current_state else "N/A",
+			jump_count,
+			max_jumps
+		])
 		
 		if can_perform_ground_slam and not is_on_floor():
 			if state_machine:
 				if state_machine.states.has("groundslam"): 
-					print("[Player] Attempting transition to 'groundslam' state.")
+					print("[Player] 執行地面衝擊")
 					state_machine._transition_to(state_machine.states["groundslam"])
 				else:
 					printerr("[Player] Error: 'groundslam' state not found in StateMachine states dictionary!")
 			else:
 				printerr("[Player] Error: StateMachine node not found!")
+		else:
+			print("[Player] 不能執行地面衝擊: 條件不滿足")
+			if is_on_floor():
+				print("[Player] - 原因: 玩家在地面上")
+			if not can_perform_ground_slam:
+				print("[Player] - 原因: can_perform_ground_slam = false")
 
 # Setter function for can_perform_ground_slam with logging
 func set_can_ground_slam(value: bool) -> void:
@@ -955,3 +998,10 @@ func set_can_ground_slam(value: bool) -> void:
 		can_perform_ground_slam = value
 		# print(f"[Player_set_can_ground_slam] Value changed from {old_value} to {can_perform_ground_slam}. Caller: {get_stack()[1] if get_stack().size() > 1 else 'Unknown'}")
 		print("[Player_set_can_ground_slam] Value changed from %s to %s. Caller: %s" % [old_value, can_perform_ground_slam, get_stack()[1] if get_stack().size() > 1 else "Unknown"])
+
+#region 輔助方法
+func get_health_percentage() -> float:
+	if max_health > 0:
+		return float(current_health) / max_health
+	return 0.0
+#endregion

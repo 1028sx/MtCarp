@@ -13,13 +13,11 @@ func _ready():
 	add_to_group("ui")
 	_initialize_bars()
 	
-	# 添加暫停選單
 	pause_menu = PauseMenu.instantiate()
 	add_child(pause_menu)
 	if pause_menu:
 		pause_menu.back_to_menu.connect(_on_back_to_menu)
 	
-	# 等待一幀後再設置信號
 	await get_tree().process_frame
 	_setup_signals()
 
@@ -40,32 +38,26 @@ func _setup_signals() -> void:
 	if not is_initialized and is_inside_tree():
 		is_initialized = true
 		
-		# 連接玩家金錢變化信號
 		var player = get_tree().get_first_node_in_group("player")
 		if player:
 			if not player.gold_changed.is_connected(update_gold):
 				player.gold_changed.connect(update_gold)
-			# 立即更新當前金錢顯示
 			update_gold(player.gold)
 
 func _connect_player():
-	# 確保節點已經在場景樹中
 	if not is_inside_tree():
 		return
 		
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
-		# 先斷開可能存在的連接
 		if player.health_changed.is_connected(_on_player_health_changed):
 			player.health_changed.disconnect(_on_player_health_changed)
 		if player.gold_changed.is_connected(update_gold):
 			player.gold_changed.disconnect(update_gold)
 		
-		# 重新連接信號
 		player.health_changed.connect(_on_player_health_changed)
 		player.gold_changed.connect(update_gold)
 		
-		# 更新血量和金錢顯示
 		_update_health_bar(player)
 		update_gold(player.gold)
 
@@ -76,7 +68,6 @@ func _update_health_bar(player: Node) -> void:
 
 func _exit_tree():
 	if get_tree():
-		# 斷開玩家信號
 		var player = get_tree().get_first_node_in_group("player")
 		if player:
 			if player.health_changed.is_connected(_on_player_health_changed):
@@ -113,14 +104,54 @@ func update_mana(mana: int):
 		tween.tween_property(mana_bar, "value", mana, 0.3)
 
 func use_revive_heart():
-	print("[UI] 隱藏重生之心")
 	if revive_heart and is_instance_valid(revive_heart):
 		revive_heart.visible = false
+		
+		var tween = create_tween()
+		tween.tween_property(revive_heart, "modulate:a", 0.0, 0.3)
+		tween.tween_callback(func(): pass)
+	
+	var main_node = get_tree().root.get_node_or_null("Main")
+	if main_node:
+		var canvas_layers = []
+		for child in main_node.get_children():
+			if child is CanvasLayer:
+				canvas_layers.append(child)
+		
+		for canvas in canvas_layers:
+			var hud_node = canvas.get_node_or_null("Control_HUD")
+			if hud_node:
+				var heart = hud_node.get_node_or_null("TextureRect_Heart")
+				if heart and heart != revive_heart:
+					heart.visible = false
+					var other_tween = create_tween()
+					other_tween.tween_property(heart, "modulate:a", 0.0, 0.3)
 
 func restore_revive_heart() -> void:
-	print("[UI] 顯示重生之心")
 	if revive_heart and is_instance_valid(revive_heart):
 		revive_heart.visible = true
+		revive_heart.modulate.a = 1.0
+		
+		var tween = create_tween()
+		tween.tween_property(revive_heart, "modulate:a", 1.0, 0.3)
+		tween.tween_callback(func(): pass)
+	
+	var main_node = get_tree().root.get_node_or_null("Main")
+	if main_node:
+		var canvas_layers = []
+		for child in main_node.get_children():
+			if child is CanvasLayer:
+				canvas_layers.append(child)
+		
+		for canvas in canvas_layers:
+			var hud_node = canvas.get_node_or_null("Control_HUD")
+			if hud_node:
+				var heart = hud_node.get_node_or_null("TextureRect_Heart")
+				if heart and heart != revive_heart:
+					heart.visible = true
+					heart.modulate.a = 1.0
+					var other_tween = create_tween()
+					other_tween.tween_property(heart, "modulate:a", 1.0, 0.3)
 
 func _on_back_to_menu():
 	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")

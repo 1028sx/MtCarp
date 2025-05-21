@@ -47,6 +47,7 @@ func process_physics(delta: float) -> void:
 		
 		if player.jump_count == player.max_jumps:
 			player.set_can_ground_slam(true)
+			print("[State_Jump] 啟用地面衝擊能力: jump_count=%s, max_jumps=%s" % [player.jump_count, player.max_jumps])
 
 		var jump_force: float
 		if player.is_double_jumping_after_wall_jump: 

@@ -7,7 +7,6 @@ extends Node2D
 @onready var ui = preload("res://scenes/ui/UI.tscn").instantiate()
 @onready var loot_selection_ui = preload("res://scenes/ui/loot_selection_ui.tscn")
 @onready var game_manager = preload("res://scenes/managers/GameManager.tscn").instantiate()
-# 不在@onready中實例化boss_ui，改為僅預加載場景
 var boss_ui_scene = preload("res://scenes/enemies/boss_ui.tscn")
 var boss_ui = null
 
@@ -22,14 +21,10 @@ func _ready():
 		add_to_group("main")
 	
 	if not player:
-		push_error("[Main] 錯誤：找不到玩家節點！")
 		return
 	
-	# 連接玩家信號
-	print("[Main] 正在連接玩家信號")
 	if not player.died.is_connected(_on_player_died):
 		player.died.connect(_on_player_died)
-		print("[Main] 已連接玩家死亡信號")
 	if not player.health_changed.is_connected(_on_player_health_changed):
 		player.health_changed.connect(_on_player_health_changed)
 	
@@ -43,7 +38,6 @@ func _ready():
 	
 	var global_ui = get_node_or_null("/root/GlobalUi")
 	if not global_ui:
-		push_error("[Main] 錯誤：找不到GlobalUi自動加載節點")
 		return
 	
 	var existing_enemy_manager = get_tree().get_first_node_in_group("enemy_manager")
@@ -68,18 +62,17 @@ func _ready():
 		game_manager.add_to_group("game_manager")
 	
 	add_child(ui)
+	ui.name = "UI"
 	
-	# 添加Boss UI - 改進的加載流程
-	print("[Main] 開始加載BossUI")
+	if player and ui:
+		if not player.gold_changed.is_connected(ui.update_gold):
+			player.gold_changed.connect(ui.update_gold)
+		if not player.health_changed.is_connected(ui._on_player_health_changed):
+			player.health_changed.connect(ui._on_player_health_changed)
+	
 
-	# 首先檢查是否有autoload的BossUI實例
 	var autoload_boss_ui = get_node_or_null("/root/BossUI")
 	if autoload_boss_ui:
-		push_warning("[Main] 警告：BossUI被配置為自動加載(autoload)，這可能導致UI顯示問題")
-		push_warning("[Main] 建議：從project.godot中移除BossUI的autoload配置")
-		print("[Main] 嘗試處理autoload的BossUI")
-		# 可以選擇將autoload的實例從場景中移除
-		# 注意：這可能在運行時導致錯誤，最好的做法是修改project.godot
 		if autoload_boss_ui.get_parent():
 			autoload_boss_ui.get_parent().remove_child(autoload_boss_ui)
 			autoload_boss_ui.queue_free()
@@ -87,56 +80,36 @@ func _ready():
 
 	var existing_boss_ui = get_tree().get_first_node_in_group("boss_ui")
 	if existing_boss_ui:
-		print("[Main] 發現已存在的BossUI節點")
 		boss_ui = existing_boss_ui
 		
-		# 檢查BossUI的父節點是否正確
 		if boss_ui.get_parent() != self:
-			print("[Main] 警告：BossUI的父節點不是Main，正在修正")
 			if boss_ui.get_parent():
 				boss_ui.get_parent().remove_child(boss_ui)
 			add_child(boss_ui)
-			print("[Main] 已修正BossUI的父節點")
 		
-		# 檢查現有BossUI的結構
 		var control_hud = boss_ui.get_node_or_null("Control_BossHUD")
 		if not control_hud:
-			push_error("[Main] 錯誤：現有BossUI缺少Control_BossHUD節點")
-			# 嘗試刪除並重新創建
 			boss_ui.queue_free()
 			await get_tree().process_frame
 			boss_ui = boss_ui_scene.instantiate()
 			add_child(boss_ui)
-			print("[Main] 已刪除損壞的BossUI並重新創建")
 		
 	else:
-		print("[Main] 創建新的BossUI")
 		boss_ui = boss_ui_scene.instantiate()
 		
-		# 確保boss_ui已添加到場景
 		add_child(boss_ui)
-		# 必須先添加到場景，再能執行節點檢查
 		await get_tree().process_frame
 		
-		# 檢查boss_ui節點結構
-		print("[Main] 檢查BossUI節點結構")
 		var control_hud = boss_ui.get_node_or_null("Control_BossHUD")
 		if control_hud:
-			print("[Main] 找到Control_BossHUD節點")
 			var texture_progress = control_hud.get_node_or_null("TextureProgressBar_BossHP")
-			if texture_progress:
-				print("[Main] 找到TextureProgressBar_BossHP節點")
-			else:
-				push_error("[Main] 錯誤：BossUI場景中未找到TextureProgressBar_BossHP節點")
+			if not texture_progress:
+				pass
 		else:
-			push_error("[Main] 錯誤：BossUI場景中未找到Control_BossHUD節點")
+			pass
 		
-		print("[Main] BossUI已添加到場景")
-		
-		# 確保BossUI已添加到boss_ui組
 		if not boss_ui.is_in_group("boss_ui"):
 			boss_ui.add_to_group("boss_ui")
-			print("[Main] BossUI已添加到boss_ui組")
 	
 	var new_loot_selection_ui = loot_selection_ui.instantiate()
 	add_child(new_loot_selection_ui)
@@ -156,20 +129,13 @@ var _pause_stack: int = 0
 
 #region 初始化
 func _initialize_game():
-	print("[Main] 開始初始化遊戲")
 	_initialize_sizes()
 	
-	# 確保在這裡連接玩家信號
 	if player:
-		print("[Main] 正在連接玩家信號")
 		if not player.died.is_connected(_on_player_died):
 			player.died.connect(_on_player_died)
-			print("[Main] 已連接玩家死亡信號")
 		if not player.health_changed.is_connected(_on_player_health_changed):
 			player.health_changed.connect(_on_player_health_changed)
-			print("[Main] 已連接玩家生命值變化信號")
-	else:
-		push_error("[Main] 錯誤：初始化時找不到玩家節點")
 	
 	_connect_signals()
 
@@ -178,23 +144,17 @@ func _connect_signals():
 	
 	var room_manager = get_node("/root/RoomManager")
 	if not room_manager:
-		push_error("[Main] 錯誤：找不到 RoomManager")
 		return
 		
 	if room_manager.has_signal("room_changed"):
 		if not room_manager.is_connected("room_changed", _on_room_changed):
 			room_manager.connect("room_changed", _on_room_changed)
 	
-	# 連接玩家信號
 	if player:
-		print("[Main] 正在連接玩家信號")
 		if not player.died.is_connected(_on_player_died):
 			player.died.connect(_on_player_died)
-			print("[Main] 已連接玩家死亡信號")
 		if not player.health_changed.is_connected(_on_player_health_changed):
 			player.health_changed.connect(_on_player_health_changed)
-	else:
-		push_error("[Main] 錯誤：找不到玩家節點")
 
 func _initialize_sizes():
 	screen_size = get_viewport_rect().size
@@ -208,22 +168,17 @@ func _setup_initial_room():
 	
 	if enemy_manager:
 		enemy_manager.spawn_enemies_for_room("Beginning1")
-	else:
-		push_error("[Main] 錯誤：找不到敵人管理器")
 
 func _setup_player_position(room):
 	if not player or not room:
-		push_error("[Main] 錯誤：無法設置玩家位置，玩家或房間節點不存在")
 		return
 		
 	var spawn_points = room.get_node_or_null("SpawnPoints")
 	if not spawn_points:
-		push_error("[Main] 錯誤：找不到SpawnPoints節點")
 		return
 		
 	var left_spawn = spawn_points.get_node_or_null("LeftSpawn")
 	if not left_spawn:
-		push_error("[Main] 錯誤：找不到LeftSpawn節點")
 		return
 		
 	player.global_position = left_spawn.global_position
@@ -237,8 +192,6 @@ func _spawn_initial_enemies(room: Node) -> void:
 			for spawn_point in enemy_spawn_points.get_children():
 				if spawn_point.name.begins_with("Spawn"):
 					_spawn_enemy(spawn_point)
-	else:
-		push_error("[Main] 無法生成敵人：enemy_manager 或 room 不存在")
 #endregion
 
 #region 遊戲系統
@@ -342,12 +295,8 @@ func _on_player_health_changed(new_health):
 		ui._on_player_health_changed(new_health)
 
 func _on_player_died():
-	print("[Main] 玩家死亡信號已接收")
 	if game_manager:
-		print("[Main] 正在調用 game_manager.game_over()")
 		game_manager.game_over()
-	else:
-		print("[Main] 錯誤：找不到 game_manager")
 #endregion
 
 #region 遊戲管理

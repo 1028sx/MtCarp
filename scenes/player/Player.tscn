@@ -1,4 +1,4 @@
-[gd_scene load_steps=189 format=3 uid="uid://b2q5462bdb0q2"]
+[gd_scene load_steps=200 format=3 uid="uid://b2q5462bdb0q2"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_b51by"]
 [ext_resource type="Texture2D" uid="uid://cyr1632llp4qs" path="res://assets/players/Sprites/DASH.png" id="2_egfxe"]
@@ -10,6 +10,7 @@
 [ext_resource type="Texture2D" uid="uid://bgkhgccrh835r" path="res://assets/players/Sprites/HURT.png" id="8_ibdch"]
 [ext_resource type="Texture2D" uid="uid://dy7gc130qkvma" path="res://assets/players/Sprites/IDLE.png" id="9_5jus7"]
 [ext_resource type="Texture2D" uid="uid://bc1xqqkty6xes" path="res://assets/players/Sprites/JUMP.png" id="10_4ebdh"]
+[ext_resource type="Texture2D" uid="uid://c3ovpu7fprajr" path="res://assets/players/Sprites/Run3.png" id="11_snl0w"]
 [ext_resource type="Texture2D" uid="uid://b3b2kd5o8dhvt" path="res://assets/players/Sprites/RUN.png" id="11_srnqu"]
 [ext_resource type="Texture2D" uid="uid://br7gfphpal5b6" path="res://assets/players/Sprites/SPECIAL ATTACK.png" id="12_1pdjf"]
 [ext_resource type="Texture2D" uid="uid://d337s6hmcv80r" path="res://assets/players/new/sprites/IMG_2090.png" id="12_ct6uc"]
@@ -29,6 +30,7 @@
 [ext_resource type="Script" path="res://scripts/player/states/State_Run.gd" id="20_r50md"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Idle.gd" id="21_2dhpi"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Fall.gd" id="22_0x2o7"]
+[ext_resource type="Script" path="res://scripts/player/PlayerAttackArea.gd" id="22_sh46p"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Jump.gd" id="23_4ug8u"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Dash.gd" id="24_8sbic"]
 [ext_resource type="Script" path="res://scripts/player/states/State_Attack.gd" id="25_nesor"]
@@ -37,6 +39,7 @@
 [ext_resource type="Script" path="res://scripts/player/states/State_Hurt.gd" id="34_pa3c0"]
 [ext_resource type="Script" path="res://scripts/player/states/State_WallSlide.gd" id="35_h76fr"]
 [ext_resource type="Script" path="res://scripts/player/states/State_GroundSlam.gd" id="36_bu6a7"]
+[ext_resource type="Script" path="res://scripts/player/states/State_Dead.gd" id="37_d38xp"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pwo0r"]
 radius = 8.5
@@ -241,6 +244,38 @@ region = Rect2(93, 0, 93, 112)
 [sub_resource type="AtlasTexture" id="AtlasTexture_ii8y8"]
 atlas = ExtResource("10_4ebdh")
 region = Rect2(186, 0, 93, 112)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sgdge"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(0, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jrnac"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(125, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_do4os"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(250, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_mxnrh"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(375, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dl2ya"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(500, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_l6xfw"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(625, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_60ji4"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(750, 0, 125, 300)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_snvxw"]
+atlas = ExtResource("11_snl0w")
+region = Rect2(875, 0, 125, 300)
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_v3141"]
 atlas = ExtResource("11_srnqu")
@@ -585,6 +620,35 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
+"texture": SubResource("AtlasTexture_sgdge")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jrnac")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_do4os")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_mxnrh")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dl2ya")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_l6xfw")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_60ji4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_snvxw")
+}],
+"loop": true,
+"name": &"new_animation",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
 "texture": SubResource("AtlasTexture_v3141")
 }, {
 "duration": 1.0,
@@ -713,7 +777,7 @@ animations = [{
 }]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_a6pnd"]
-radius = 5.0
+radius = 8.0
 height = 130.0
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_a3ls5"]
@@ -1155,7 +1219,6 @@ animations = [{
 [node name="Player" type="CharacterBody2D" groups=["player"]]
 collision_layer = 2
 script = ExtResource("1_b51by")
-max_health = 1000
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(-2, 38)
@@ -1166,20 +1229,22 @@ shape = SubResource("CapsuleShape2D_pwo0r")
 position = Vector2(-1, -27)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_pdjgy")
-animation = &"idle"
+animation = &"new_animation"
+frame = 3
+frame_progress = 0.218661
 
 [node name="GroundSlamArea" type="Area2D" parent="."]
-collision_layer = 128
-collision_mask = 8
+collision_layer = 32
+collision_mask = 16
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="GroundSlamArea"]
-position = Vector2(-1, 68)
+position = Vector2(-1, 65)
 rotation = 1.5708
 shape = SubResource("CapsuleShape2D_a6pnd")
 
 [node name="Hitbox" type="Area2D" parent="."]
 collision_layer = 8
-collision_mask = 128
+collision_mask = 64
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
 visible = false
@@ -1187,15 +1252,19 @@ position = Vector2(-2, 38)
 shape = SubResource("CapsuleShape2D_a6pnd")
 
 [node name="AttackArea" type="Area2D" parent="."]
-visible = false
-collision_layer = 128
-collision_mask = 8
+collision_layer = 32
+collision_mask = 16
+monitoring = false
+script = ExtResource("22_sh46p")
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="AttackArea"]
 polygon = PackedVector2Array(-37, -2, 1, 66, 96, 72, 90, 26, 46, -6)
 
 [node name="SpecialAttackArea" type="Area2D" parent="."]
-visible = false
+collision_layer = 32
+collision_mask = 16
+monitoring = false
+monitorable = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="SpecialAttackArea"]
 position = Vector2(0, -30)
@@ -1203,7 +1272,6 @@ scale = Vector2(2, 2)
 shape = SubResource("CapsuleShape2D_a3ls5")
 
 [node name="EffectManager" type="Node2D" parent="."]
-visible = false
 script = ExtResource("14_0086w")
 
 [node name="DoubleJumpEffect" type="AnimatedSprite2D" parent="EffectManager"]
@@ -1310,6 +1378,9 @@ idle_state = NodePath("../Idle")
 
 [node name="GroundSlam" type="Node" parent="StateMachine"]
 script = ExtResource("36_bu6a7")
+
+[node name="Dead" type="Node" parent="StateMachine"]
+script = ExtResource("37_d38xp")
 
 [node name="MetroidvaniaSystem" type="Node" parent="."]
 script = ExtResource("27_vq02x")

@@ -95,6 +95,11 @@ func _ready():
 	if not is_in_group("boss"):
 		add_to_group("boss")
 		print("[Boss] 已添加到boss組")
+		
+	# 確保將自己添加到enemy組（重要！）
+	if not is_in_group("enemy"):
+		add_to_group("enemy")
+		print("[Boss] 已添加到enemy組")
 	
 	# 確保健康值等於最大健康值
 	health = max_health
@@ -167,8 +172,10 @@ func _setup_collisions():
 	if hitbox:
 		hitbox.collision_layer = 0
 		hitbox.set_collision_layer_value(3, true)   # 設為受傷區域
+		hitbox.set_collision_layer_value(8, true)   # 確保在地面衝擊可檢測層
 		hitbox.collision_mask = 0
 		hitbox.set_collision_mask_value(4, true)    # 檢測攻擊區域
+		hitbox.set_collision_mask_value(128, true)  # 檢測玩家攻擊（包括地面衝擊）
 		hitbox.monitoring = true
 		hitbox.monitorable = true
 
@@ -754,13 +761,14 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 			if not area.monitoring:
 				return  # 攻擊區域未激活，直接返回
 			
-			# 方法1：檢查普通攻擊
-			if area.name == "AttackArea":
-				# 檢查玩家當前狀態名稱
-				if parent.state_machine and parent.state_machine.current_state:
-					var state_name = parent.state_machine.current_state.name.to_lower()
+			# 檢查玩家狀態和攻擊區域的對應關係
+			if parent.state_machine and parent.state_machine.current_state:
+				var state_name = parent.state_machine.current_state.name.to_lower()
+				
+				# 方法1：檢查普通攻擊
+				if area.name == "AttackArea":
 					# 嚴格檢查：必須包含"attack"且不是"dashing"或其他非攻擊狀態
-					if "attack" in state_name and not "dash" in state_name:
+					if "attack" in state_name and not "dash" in state_name and not "special" in state_name and not "slam" in state_name:
 						is_real_attack = true
 						# 獲取普通攻擊傷害
 						if parent.has_method("get_attack_damage"):
@@ -769,12 +777,11 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 							damage_amount = parent.current_attack_damage
 						else:
 							damage_amount = 20  # 預設傷害值
-			
-			# 方法2：檢查特殊攻擊
-			elif area.name == "SpecialAttackArea":
-				if parent.state_machine and parent.state_machine.current_state:
-					var state_name = parent.state_machine.current_state.name.to_lower()
-					if "special" in state_name or "slam" in state_name:
+				
+				# 方法2：檢查特殊攻擊 - 更嚴格的檢查
+				elif area.name == "SpecialAttackArea":
+					# 只接受完全匹配"specialattack"的狀態，拒絕"groundslam"
+					if state_name == "specialattack":
 						is_real_attack = true
 						# 獲取特殊攻擊傷害
 						if parent.has_method("get_special_attack_damage"):
@@ -782,12 +789,18 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 						elif "current_special_attack_damage" in parent:
 							damage_amount = parent.current_special_attack_damage
 						else:
-							damage_amount = 40  # 預設特殊攻擊傷害值
+							damage_amount = 30  # 預設特殊攻擊傷害值
+				
+				# 方法3：檢查地面衝擊
+				elif area.name == "GroundSlamArea":
+					if state_name == "groundslam":
+						is_real_attack = true
+						# 獲取地面衝擊傷害
+						damage_amount = 30  # 地面衝擊傷害值
 			
 			# 只有當確認是真實攻擊且造成有效傷害時，才應用傷害
 			if is_real_attack and damage_amount > 0:
 				take_damage(damage_amount)
-				print("Boss受到玩家攻擊，傷害值:", damage_amount, " 攻擊區域:", area.name, " 狀態:", parent.state_machine.current_state.name)
 
 func jump_state():
 	if is_on_floor() and not has_jumped:  # 有在地面且還沒跳過時才跳躍

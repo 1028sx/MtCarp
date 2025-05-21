@@ -41,7 +41,6 @@ func get_transition() -> PlayerState:
 		if sa_state:
 			return sa_state
 
-
 	if Input.is_action_just_pressed("dash") and dash_state and player.can_dash and player.dash_cooldown_timer <= 0:
 		return dash_state
 

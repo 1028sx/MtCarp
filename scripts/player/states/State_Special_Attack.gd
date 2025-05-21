@@ -44,6 +44,9 @@ func on_animation_finished(anim_name: String) -> void:
 		animation_finished = true
 
 func on_frame_changed(frame: int) -> void:
+	if player.state_machine.current_state != self:
+		return
+		
 	if player.animated_sprite.animation == "special_attack":
 		if frame >= DAMAGE_START_FRAME and frame <= DAMAGE_END_FRAME:
 			_apply_special_attack_damage()
@@ -53,6 +56,9 @@ func on_frame_changed(frame: int) -> void:
 
 
 func _apply_special_attack_damage() -> void:
+	if player.state_machine.current_state != self:
+		return
+		
 	if not player.special_attack_area.monitoring:
 		player.special_attack_area.monitoring = true
 		await player.get_tree().physics_frame
