@@ -326,65 +326,40 @@ func _enter_phase_two():
 #endregion
 
 #region 狀態改變
-func _change_state(new_state: GiantFishState):
-	# 首先調用父類的狀態改變，以處理通用邏輯和動畫播放器檢查
-	# 注意：父類的 _change_state 可能會播放基於 BossState 的動畫
-	# 我們在這裡會根據 GiantFishState 覆蓋或指定更具體的動畫
-	var old_state_for_super = current_state # 在父類看來，這仍然是 BossState
-	super._change_state(new_state) # 父類會處理 current_state = new_state
+func _change_state(new_state):
+	var _old_state_name_gf = "UNKNOWN_GF_STATE"
+	var old_state_idx = GiantFishState.values().find(current_state)
+	if old_state_idx != -1:
+		_old_state_name_gf = GiantFishState.keys()[old_state_idx]
+	
+	var _new_state_name_gf = "UNKNOWN_GF_STATE"
+	var new_state_idx = GiantFishState.values().find(new_state)
+	if new_state_idx != -1:
+		_new_state_name_gf = GiantFishState.keys()[new_state_idx]
+	
+	super._change_state(new_state)
 
-	# 如果父類已經播放了正確的動畫（例如 ANIM_IDLE, ANIM_HURT 等），
-	# 並且子類狀態與父類狀態枚舉值相同，則可能不需要再次播放。
-	# 但為了清晰和確保特定動畫，我們在這裡顯式指定。
-
-	if not animated_sprite:
-		# 父類的 _change_state 應該已經檢查過 animated_sprite
-		# 但為了安全起見，再次確認
-		push_error("AnimatedSprite node not found in GiantFishBoss after super._change_state!")
-		return
-
-	match new_state: # 使用 new_state，因為 current_state 已經被父類更新
-		GiantFishState.IDLE:
-			animated_sprite.play("idle")
-		GiantFishState.MOVE: # 對應 ACTION_SIDE_MOVE_ATTACK
-			animated_sprite.play("move")
-		GiantFishState.DIVE:
-			animated_sprite.play("dive_in")
+	match current_state:
 		GiantFishState.SUBMERGED_MOVE:
-			animated_sprite.play("dive_move") # <--- 更新後的動畫名稱
+			submerged_move_current_timer = 0.0
+			if target_player:
+				submerged_move_target_position = Vector2(target_player.global_position.x, global_position.y)
+		GiantFishState.IDLE:
+			action_has_spawned_bubbles_in_phase2 = false
 		GiantFishState.EMERGE_JUMP:
-			animated_sprite.play("emerge_jump")
+			velocity.y = emerge_jump_height
+			_spawn_bubbles_if_phase_two_and_not_spawned()
 		GiantFishState.TAIL_SWIPE:
-			animated_sprite.play("tail_swipe")
+			action_has_spawned_bubbles_in_phase2 = false
 		GiantFishState.BUBBLE_ATTACK_STATE:
-			if not is_phase_two: # 只有一階段有獨立的吐泡泡動畫
-				animated_sprite.play("bubble_attack")
+			if not is_phase_two:
+				pass
 			else:
-				# 二階段的吐泡泡攻擊可能沒有獨立動畫，或者與其他動作組合
-				# 如果二階段吐泡泡時 Boss 處於例如 IDLE 狀態，則播放 IDLE
-				animated_sprite.play("idle") # 或者其他合適的動畫
+				super._change_state(GiantFishState.IDLE)
 		GiantFishState.HURT:
-			animated_sprite.play(ANIM_HURT) # 使用父類常量
+			pass
 		GiantFishState.DEFEATED:
-			animated_sprite.play("defeat") # 使用具體名稱
-		GiantFishState.APPEAR:
-			animated_sprite.play(ANIM_APPEAR) # 使用父類常量
-		GiantFishState.PHASE_TRANSITION:
-			# 根據實際情況決定過渡動畫，目前暫用 idle
-			animated_sprite.play("idle")
-		_:
-			# 對於任何未明確處理的狀態，或者枚舉值與父類相同的其他 BossState
-			# 例如 BossState.ATTACKING (如果有的話)
-			# 可以依賴父類 _change_state 的處理，或者播放一個默認動畫
-			if animated_sprite.has_animation(ANIM_IDLE): # 檢查動畫是否存在
-				animated_sprite.play(ANIM_IDLE)
-			else:
-				push_warning("Default animation ANIM_IDLE not found for state: %s" % GiantFishState.keys()[new_state])
-
-
-	if is_phase_two and (new_state == GiantFishState.TAIL_SWIPE or new_state == GiantFishState.EMERGE_JUMP or new_state == GiantFishState.MOVE):
-		_spawn_bubbles_for_action()
-
+			pass
 #endregion
 
 #region 動畫回調
