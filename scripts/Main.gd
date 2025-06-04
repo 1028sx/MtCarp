@@ -23,8 +23,6 @@ func _ready():
 	if not player:
 		return
 	
-	if not player.died.is_connected(_on_player_died):
-		player.died.connect(_on_player_died)
 	if not player.health_changed.is_connected(_on_player_health_changed):
 		player.health_changed.connect(_on_player_health_changed)
 	
@@ -132,8 +130,6 @@ func _initialize_game():
 	_initialize_sizes()
 	
 	if player:
-		if not player.died.is_connected(_on_player_died):
-			player.died.connect(_on_player_died)
 		if not player.health_changed.is_connected(_on_player_health_changed):
 			player.health_changed.connect(_on_player_health_changed)
 	
@@ -151,8 +147,6 @@ func _connect_signals():
 			room_manager.connect("room_changed", _on_room_changed)
 	
 	if player:
-		if not player.died.is_connected(_on_player_died):
-			player.died.connect(_on_player_died)
 		if not player.health_changed.is_connected(_on_player_health_changed):
 			player.health_changed.connect(_on_player_health_changed)
 
@@ -293,10 +287,6 @@ func _on_room_changed():
 func _on_player_health_changed(new_health):
 	if ui and game_manager:
 		ui._on_player_health_changed(new_health)
-
-func _on_player_died():
-	if game_manager:
-		game_manager.game_over()
 #endregion
 
 #region 遊戲管理

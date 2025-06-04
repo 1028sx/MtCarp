@@ -47,7 +47,7 @@ func get_transition() -> PlayerState:
 		
 		return jump_state
 	
-	if Input.is_action_just_pressed("attack") and attack_state:
+	if Input.is_action_pressed("attack") and attack_state:
 		return attack_state
 	
 	if Input.is_action_just_pressed("special_attack") and player.can_special_attack:

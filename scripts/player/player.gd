@@ -153,6 +153,7 @@ signal gold_changed(new_gold: int)
 
 # warning-ignore:unused_signal
 signal effect_changed(effects: Dictionary)
+signal player_fully_died
 
 var agile_perfect_dodge := false
 var agile_dodge_window := 0.2
@@ -185,11 +186,15 @@ func _ready() -> void:
 	_initialize_player()
 	_setup_collisions()
 	_connect_signals()
+	_connect_death_state_signal()
 	current_attack_damage = base_attack_damage
 	current_special_attack_damage = base_special_attack_damage
 	active_effects = {}
 	emit_signal("effect_changed", active_effects)
 
+	# Register with PlayerGlobal
+	if PlayerGlobal:
+		PlayerGlobal.register_player(self)
 
 func _physics_process(delta: float) -> void:
 	if _handle_camera_mode(delta):
@@ -222,6 +227,11 @@ func _input(event: InputEvent) -> void:
 	
 	if state_machine and state_machine.current_state:
 		state_machine._input(event)
+
+func _tree_exiting() -> void:
+	# Unregister from PlayerGlobal when the player is removed from the scene tree
+	if PlayerGlobal and PlayerGlobal.get_player() == self:
+		PlayerGlobal.unregister_player()
 
 #endregion
 
@@ -274,6 +284,30 @@ func _connect_signals() -> void:
 	
 	if effect_manager and not effect_manager.effect_finished.is_connected(_on_effect_finished):
 		effect_manager.effect_finished.connect(_on_effect_finished)
+
+func _connect_death_state_signal():
+	# 使用 call_deferred 確保狀態機和狀態節點已準備好
+	call_deferred("_deferred_connect_death_state_signal")
+
+func _deferred_connect_death_state_signal():
+	if state_machine and state_machine.states.has("dead"):
+		var dead_state = state_machine.states.get("dead") # 使用 .get() 更安全
+		if is_instance_valid(dead_state): # 檢查實例是否有效
+			if not dead_state.death_animation_truly_finished.is_connected(_on_death_animation_truly_finished):
+				var error_code = dead_state.death_animation_truly_finished.connect(_on_death_animation_truly_finished)
+				if error_code != OK:
+					printerr("[Player] Failed to connect to State_Dead.death_animation_truly_finished. Error: ", error_code)
+				else:
+					print_debug("[Player] Successfully connected to State_Dead.death_animation_truly_finished.")
+		else:
+			printerr("[Player] 'dead' state instance is invalid in _deferred_connect_death_state_signal.")
+	else:
+		printerr("[Player] Could not find 'dead' state in StateMachine to connect signal in _deferred_connect_death_state_signal.")
+
+func _on_death_animation_truly_finished():
+	# 這是 State_Dead 動畫播放完畢後的回調
+	print_debug("[Player] Death animation truly finished (received from State_Dead). Emitting player_fully_died.")
+	player_fully_died.emit()
 
 #endregion
 
@@ -419,25 +453,32 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 				ui.use_revive_heart()
 			set_invincible(2.0) # Grant invincibility after revive
 			print("[Player_take_damage] Player Revived! Granted 2s invincibility.")
-			# 考慮是否需要強制轉換狀態，例如回到 Idle 或 Fall
-			# if state_machine and state_machine.states.has("idle"): 
-			#    state_machine._transition_to(state_machine.states["idle"])
+			# Consider transitioning to a specific state after revive if needed
+			# if state_machine and state_machine.states.has("idle"):
+			# state_machine._transition_to(state_machine.states["idle"])
 		else:
 			# Actual Death
-			print("[Player_take_damage] Player Died!")
+			print("[Player_take_damage] Player Died! Initiating death state.")
 			set_physics_process(false) # Stop player physics
 			set_process_input(false) # Stop player input
 			
-			# 轉換到死亡狀態
+			# Transition to death state
 			if state_machine and state_machine.states.has("dead"):
 				state_machine._transition_to(state_machine.states["dead"])
 			else:
-				printerr("[Player_take_damage] 錯誤：找不到死亡狀態！")
-				# 如果沒有死亡狀態，則默認處理
+				printerr("[Player_take_damage] Error: 'dead' state not found in StateMachine!")
+				# If no death state, we might need to manually emit the fully_died signal here
+				# as a fallback, or consider this a critical error.
+				# For now, assume death state handles emitting via its animation.
+				# If State_Dead might not exist or its animation signal might not fire,
+				# emitting here would be a backup.
+				# player_fully_died.emit() # Fallback if no proper death state path
 				if animated_sprite: 
-					animated_sprite.stop()
+					animated_sprite.stop() # Stop animation if no death state
 			
-			died.emit() # Signal that player died
+			# died.emit() # Signal that player died <--- REMOVED/COMMENTED OUT
+			# The 'player_fully_died' signal will be emitted by _on_death_animation_truly_finished
+			# after the State_Dead has confirmed its animation is complete.
 		return # Stop further processing after death/revive
 
 	# 6. Handle interruption vs Super Armor (only if not dead and not invincible/dashing)

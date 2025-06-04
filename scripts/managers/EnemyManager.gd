@@ -120,7 +120,8 @@ func _ready():
 	add_child(spawn_timer)
 	
 	# 確保不會在場景切換時被暫停
-	process_mode = Node.PROCESS_MODE_ALWAYS
+	# process_mode = Node.PROCESS_MODE_ALWAYS # MODIFIED: Commented out
+	process_mode = Node.PROCESS_MODE_INHERIT # MODIFIED: Explicitly set to INHERIT (default behavior)
 	
 	# 連接自己的信號
 	all_enemies_defeated.connect(_on_all_enemies_defeated)

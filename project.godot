@@ -27,6 +27,7 @@ WordSystem="*res://autoload/WordSystem.gd"
 RoomManager="*res://scripts/managers/RoomManager.gd"
 GlobalUi="*res://autoload/GlobalUI.gd"
 GameManager="*res://scripts/managers/GameManager.gd"
+PlayerGlobal="*res://scripts/globals/PlayerGlobal.gd"
 
 [editor]
 

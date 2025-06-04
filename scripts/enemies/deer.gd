@@ -1,6 +1,5 @@
 extends CharacterBody2D
 
-signal defeated
 signal phase_changed(phase: int)
 signal health_changed(current: float, max_health: float)
 signal boss_appeared

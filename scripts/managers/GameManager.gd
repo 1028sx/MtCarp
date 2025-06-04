@@ -25,6 +25,15 @@ var sfx_volume = 1.0
 var music_player: AudioStreamPlayer
 var sfx_player: AudioStreamPlayer
 
+const GameOverScreenScene = preload("res://scenes/ui/game_over_screen.tscn") # ADDED: Preload GameOverScreen
+var game_over_screen_instance = null # ADDED: Instance variable for GameOverScreen
+
+var _is_player_died_connected := false
+# var _is_player_fully_died_connected := false # 新增標誌給新的信號 # REMOVED
+var _is_player_fully_died_signal_connected := false # ADDED: Flag for player_fully_died connection
+var _game_over_initiated := false # ADDED: Flag to ensure game_over logic runs once
+# var _current_player_instance_id_connected_fully_died: int = 0 # REMOVED as it's no longer used
+
 var double_rewards_chance: float = 0.0
 var all_drops_once_enabled: bool = false
 var all_drops_once_used: bool = false
@@ -50,33 +59,41 @@ func _ready():
 	music_player = get_node_or_null("MusicPlayer")
 	sfx_player = get_node_or_null("SFXPlayer")
 	add_to_group("game_manager")
-	name = "game_manager"  # 確保名稱正確
+	name = "game_manager"
 	
 	# 連接玩家信號
-	await get_tree().process_frame
-	var player = get_tree().get_first_node_in_group("player")
-	if player:
-		if player.has_signal("died") and not player.died.is_connected(_on_player_died):
-			player.died.connect(_on_player_died)
+	# await get_tree().process_frame # No longer needed to wait for player to be in group
+	# var player = get_tree().get_first_node_in_group("player") # Old method
+
+	# 使用 PlayerGlobal 連接玩家信號
+	if PlayerGlobal:
+		if PlayerGlobal.is_player_available(): # 改回使用 Autoload 名稱
+			_connect_to_player_signals(PlayerGlobal.get_player()) # 改回使用 Autoload 名稱
+		# Connect to the signal for when player registration changes
+		if not PlayerGlobal.player_registration_changed.is_connected(_on_player_registration_changed):
+			PlayerGlobal.player_registration_changed.connect(_on_player_registration_changed)
 	else:
-		print("[GameManager] 警告：找不到玩家節點")
+		printerr("[GameManager] CRITICAL: PlayerGlobal autoload node not found!")
 	
-	# 初始化遊戲設置
 	load_settings()
 	
-	# 連接房間管理器信號
 	var room_manager = get_node_or_null("/root/RoomManager")
 	if room_manager and room_manager.has_signal("room_changed"):
 		if not room_manager.room_changed.is_connected(reset_room_effects):
 			room_manager.room_changed.connect(reset_room_effects)
 
-func _on_player_died():
+func _on_player_fully_died_trigger() -> void:
+	if _game_over_initiated: # 如果已經初始化過，直接返回
+		print_debug("[GameManager] Game over sequence already initiated. Ignoring duplicate trigger.")
+		return
+
+	_game_over_initiated = true # 標記為已初始化
+	print_debug("[GameManager] Player_fully_died signal received. Starting game over sequence. (First time only)")
 	game_over()
 
 func start_game():
 	current_state = GameState.PLAYING
 	reset_game_progress()
-	# 開始播放背景音樂
 	if music_player:
 		music_player.play()
 
@@ -221,8 +238,11 @@ func process_loot_effect(effect) -> void:
 		return
 	
 	# 獲取玩家引用
-	var player = get_tree().get_first_node_in_group("player")
+	# var player = get_tree().get_first_node_in_group("player") # Old method
+	var player = PlayerGlobal.get_player() # 改回使用 Autoload 名稱
+
 	if not player or not player.has_method("apply_effect"):
+		printerr("[GameManager.process_loot_effect] Player not found or missing 'apply_effect' method.")
 		return
 	
 	# 應用效果到玩家
@@ -242,10 +262,10 @@ func reset_combo() -> void:
 	current_combo = 0
 
 func game_over() -> void:
+	print_debug("[GameManager] game_over() function EXECUTED! Attempting to pause tree.")
 	get_tree().paused = true
 	current_state = GameState.GAME_OVER
 	
-	# 停止背景音樂，播放遊戲結束音效
 	if music_player:
 		music_player.stop()
 	
@@ -253,12 +273,85 @@ func game_over() -> void:
 		sfx_player.stream = load("res://assets/sounds/game_over.wav")
 		sfx_player.play()
 	
-	# 通過 UI 節點獲取遊戲結束畫面
-	var ui = get_tree().get_first_node_in_group("ui")
-	if ui:
-		var game_over_screen = ui.get_node_or_null("GameOverScreen")
-		if game_over_screen:
-			game_over_screen.show_screen()
+	if not is_inside_tree():
+		printerr("[GameManager] game_over() called, but node is not inside the tree. Aborting UI display.")
+		return
+
+	# 實例化並顯示 GameOverScreen
+	if not is_instance_valid(game_over_screen_instance):
+		game_over_screen_instance = GameOverScreenScene.instantiate()
+		var main_scene = get_tree().root.get_node_or_null("Main") # Adjust path if your main scene is named differently or elsewhere
+		if main_scene:
+			main_scene.add_child(game_over_screen_instance)
+		else:
+			get_tree().root.add_child(game_over_screen_instance) # Fallback to root
+			printerr("[GameManager] Could not find 'Main' scene, GameOverScreen added to root. Ensure 'Main' node exists at /root/Main or adjust path.")
+
+	if is_instance_valid(game_over_screen_instance):
+		if not game_over_screen_instance.is_inside_tree(): # Ensure it's in the tree
+			var main_scene = get_tree().root.get_node_or_null("Main")
+			if main_scene:
+				main_scene.add_child(game_over_screen_instance)
+			else:
+				get_tree().root.add_child(game_over_screen_instance)
+		
+		game_over_screen_instance.show_screen()
+	else:
+		printerr("[GameManager] Failed to instantiate or add GameOverScreen.")
+
+# 新增一個函數來處理玩家信號連接
+func _connect_to_player_signals(player_node: CharacterBody2D) -> void:
+	if is_instance_valid(player_node):
+		# 斷開舊的 died 信號連接 (如果存在且已連接到舊的處理函數)
+		if player_node.has_signal("died") and _is_player_died_connected:
+			_is_player_died_connected = false # 標記為未連接，因為我們不再使用這個信號了
+			print_debug("[GameManager] Cleaned up old 'died' signal connection flag if any.")
+
+		# 連接 player_fully_died 信號
+		if player_node.has_signal("player_fully_died"):
+			if player_node.player_fully_died.is_connected(_on_player_fully_died_trigger):
+				# 如果 Godot 說已經連接了，那我們就相信它，並確保我們的標誌也是 true
+				if not _is_player_fully_died_signal_connected:
+					_is_player_fully_died_signal_connected = true
+					print_debug("[GameManager] Signal 'player_fully_died' was already connected (detected by is_connected). Flag updated.")
+				else:
+					print_debug("[GameManager] Signal 'player_fully_died' is connected and flag is consistent.")
+			else:
+				# Godot 說沒有連接，所以我們嘗試連接
+				var error_code = player_node.player_fully_died.connect(_on_player_fully_died_trigger)
+				if error_code == OK:
+					_is_player_fully_died_signal_connected = true
+					print_debug("[GameManager] Successfully connected to player 'player_fully_died' signal.")
+				else:
+					_is_player_fully_died_signal_connected = false # 確保標誌正確
+					printerr("[GameManager] ERROR: Failed to connect to player 'player_fully_died' signal. Error code: ", error_code)
+		else:
+			printerr("[GameManager] ERROR: Player node does not have 'player_fully_died' signal.")
+		
+		# 連接玩家血量變化信號 (如果需要)
+		# if player_node.has_signal("health_changed"):
+		# ... existing code ...
+	else:
+		print_debug("[GameManager] Failed to connect to player signals: player node is invalid.")
+
+func _on_player_registration_changed(is_registered: bool) -> void:
+	print_debug("[GameManager] Player registration changed. Registered: ", is_registered)
+	if is_registered:
+		var player_node = PlayerGlobal.get_player()
+		if is_instance_valid(player_node):
+			_connect_to_player_signals(player_node)
+		else:
+			printerr("[GameManager] Player registered in PlayerGlobal but instance is invalid!")
+	else:
+		# 玩家註銷了，重置連接標誌
+		_is_player_fully_died_signal_connected = false
+		print_debug("[GameManager] Player unregistered. Resetting _is_player_fully_died_signal_connected flag.")
+		
+		# 當玩家註銷時（例如返回主選單或重新開始關卡），重置 game_over_initiated 標誌
+		_game_over_initiated = false 
+		print_debug("[GameManager] Player unregistered. Resetting _game_over_initiated flag.")
+		
+		cleanup_game_over_screen() # ADDED: Clean up GameOverScreen when player unregisters
 
 func reset_game() -> void:
 	play_time = 0.0
@@ -271,3 +364,14 @@ func reset_room_effects() -> void:
 	# 重置房間相關的效果
 	if all_drops_once_enabled and all_drops_once_used:
 		all_drops_once_used = false
+
+func show_temporary_message(message: String, duration: float = 2.0) -> void:
+	pass # ADDED pass to fix indentation error
+	# ... existing code ...
+
+# ADDED: Function to clean up the GameOverScreen instance
+func cleanup_game_over_screen() -> void:
+	if is_instance_valid(game_over_screen_instance):
+		game_over_screen_instance.queue_free()
+		game_over_screen_instance = null
+		print_debug("[GameManager] GameOverScreen cleaned up.")

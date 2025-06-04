@@ -60,6 +60,7 @@ var attack_patterns: Dictionary = {}
 var phase_attacks: Dictionary = {}
 var vulnerable: bool = true
 var target_player: CharacterBody2D = null
+var active: bool = true
 
 # 移動相關
 var gravity: float = ProjectSettings.get_setting("physics/2d/default_gravity")
@@ -88,6 +89,14 @@ func _ready() -> void:
 	_connect_signals()
 	_setup_attack_patterns()
 
+	# Attempt to get player from PlayerGlobal on ready
+	if PlayerGlobal and PlayerGlobal.is_player_available():
+		target_player = PlayerGlobal.get_player()
+		print_debug("[Boss._ready] Initial target_player set from PlayerGlobal: ", target_player.name if target_player else "null")
+	# Connect to PlayerGlobal's signal to know when player registration changes
+	if PlayerGlobal and not PlayerGlobal.player_registration_changed.is_connected(_on_player_registration_changed):
+		PlayerGlobal.player_registration_changed.connect(_on_player_registration_changed)
+
 	if animated_sprite:
 		if not animated_sprite.animation_finished.is_connected(_on_animation_finished):
 			animated_sprite.animation_finished.connect(_on_animation_finished)
@@ -99,17 +108,65 @@ func _ready() -> void:
 	else:
 		state_label.visible = false
 
+func is_player_valid(p_player: Node) -> bool:
+	# Now, just check if the provided node is the one registered in PlayerGlobal
+	# and also ensure it's a valid instance (it might have been freed).
+	if not PlayerGlobal:
+		printerr("[Boss.is_player_valid] PlayerGlobal not available!")
+		return false
+	return p_player != null and is_instance_valid(p_player) and p_player == PlayerGlobal.get_player()
+
+func _handle_vision_cone_detection(delta: float) -> void:
+	pass # TODO: Implement vision cone logic if needed
+
 func _physics_process(delta: float) -> void:
+	if not active: return
+
+	# Primary way to get player is now through PlayerGlobal, updated by _on_player_registration_changed
+	# The fallback logic below can be significantly simplified or removed if PlayerGlobal is reliable.
+	# For now, let's keep a simplified version that only tries if target_player is null AND PlayerGlobal has a player.
+
+	if not is_instance_valid(target_player): # More robust check than just target_player == null
+		if PlayerGlobal and PlayerGlobal.is_player_available():
+			var player_from_global = PlayerGlobal.get_player()
+			if is_instance_valid(player_from_global): # Double check validity
+				target_player = player_from_global
+				# print_debug("[Boss Fallback] Acquired player from PlayerGlobal: ", target_player.name)
+		# else: # Player not available in PlayerGlobal either, or PlayerGlobal itself is missing.
+			# if current_state != BossState.IDLE and current_state != BossState.APPEAR and current_state != BossState.DEFEATED:
+				# No valid player, ensure we are in a state that doesn't require one (like IDLE)
+				# _change_state(BossState.IDLE) # This might be too aggressive, handled by _on_player_registration_changed now
+			# pass
+
+	# Original fallback logic (commented out, can be removed later if PlayerGlobal proves robust)
+	# if not is_player_valid(target_player) and current_state != BossState.APPEAR and current_state != BossState.DEFEATED and current_state != BossState.PHASE_TRANSITION: # Added PHASE_TRANSITION
+	# 	var frame = Engine.get_physics_frames()
+	# 	print_debug("[Boss Fallback@", frame, "] Attempting to find player. Current target_player is null: ", target_player == null, ", Current State: ", BossState.keys()[BossState.values().find(current_state)] if BossState.values().has(current_state) else current_state)
+	# 	var potential_targets = get_tree().get_nodes_in_group("Player") # This is the part we want to replace mostly
+	# 	if not potential_targets.is_empty():
+	# 		print_debug("[Boss Fallback@", frame, "] Found potential targets: ", potential_targets.size())
+	# 		var new_target = potential_targets[0] as CharacterBody2D # Assuming player is CharacterBody2D
+	# 		# Check if new_target is valid using the Boss's own validation method
+	# 		if is_player_valid(new_target): # is_player_valid will now use PlayerGlobal
+	# 			target_player = new_target
+	# 			print_debug("[Boss Fallback@", frame, "] Target acquired: ", target_player.name if target_player else "null")
+	# 		else:
+	# 			var nt_name = new_target.name if new_target else "null_node"
+	# 			var nt_valid_instance = is_instance_valid(new_target) if new_target else "N/A"
+	# 			var nt_in_group = new_target.is_in_group("Player") if new_target and nt_valid_instance else "N/A"
+	# 			print_debug("[Boss Fallback@", frame, "] Potential target node '", nt_name, "' is NOT valid by Boss.is_player_valid(). InstanceValid: ", nt_valid_instance, ", InGroupPlayer: ", nt_in_group)
+	# 	else:
+	# 		print_debug("[Boss Fallback@", frame, "] No potential targets found in group 'Player'.")
+	
+	_handle_vision_cone_detection(delta)
+
 	if current_state == BossState.DEFEATED:
 		return
 		
 	if not is_on_floor() and current_state != BossState.APPEAR:
 		velocity.y += gravity * delta
 	
-	if knockback_velocity != Vector2.ZERO:
-		velocity = knockback_velocity
-		knockback_velocity = knockback_velocity.move_toward(Vector2.ZERO, delta * 2000 * knockback_resistance)
-	else:
+	# 狀態特定邏輯
 		match current_state:
 			BossState.IDLE:
 				_process_idle_state(delta)
@@ -119,19 +176,22 @@ func _physics_process(delta: float) -> void:
 				_process_phase_transition(delta)
 			BossState.MOVE:
 				_process_move_state(delta)
-			BossState.ATTACK:
-				_process_attack_state(delta)
-			BossState.SPECIAL_ATTACK:
-				_process_special_attack_state(delta)
 			BossState.HURT:
 				_process_hurt_state(delta)
 	
+	# 更新動畫
 	_update_animation()
+
+	if knockback_velocity != Vector2.ZERO:
+		velocity = knockback_velocity
+		knockback_velocity = knockback_velocity.move_toward(Vector2.ZERO, delta * 2000 * knockback_resistance)
+
+	# 最終移動前打印速度
+	print("[Boss _physics_process] Node: ", name, ", Velocity BEFORE move_and_slide: ", velocity)
+	move_and_slide()
 	
 	if debug_mode and state_label:
 		state_label.text = BossState.keys()[current_state] + " - Phase: " + str(current_phase)
-	
-	move_and_slide()
 #endregion
 
 #region 初始化系統
@@ -434,22 +494,32 @@ func _on_animation_finished() -> void:
 				_on_defeated()
 
 func _on_detection_area_body_entered(body: Node2D) -> void:
-	if body.is_in_group("player") and not target_player:
-		target_player = body
+	# if body.is_in_group("player") and not target_player: # Old check
+	if PlayerGlobal and PlayerGlobal.get_player() == body and not is_instance_valid(target_player):
+		target_player = body as CharacterBody2D # Cast to be sure
+		print_debug("[Boss _on_detection_area_body_entered] Player entered detection area. Target acquired: ", target_player.name if target_player else "null")
 		if current_state >= 0 and current_state < BossState.size():
 			pass
 		if current_state == BossState.IDLE:
-			_change_state(BossState.APPEAR)
-	elif body.is_in_group("player") and target_player:
+			_change_state(BossState.APPEAR) # Consider changing to MOVE if player is already there
+	# elif body.is_in_group("player") and target_player: # Old check, if already has a target, this might be redundant if it's the same player
+	elif PlayerGlobal and PlayerGlobal.get_player() == body and is_instance_valid(target_player):
+		# Player is the same as current target, no action needed or maybe refresh something?
 		if current_state >= 0 and current_state < BossState.size():
 			pass
 
 func _on_detection_area_body_exited(body: Node2D) -> void:
-	if body == target_player:
+	# if body == target_player: # Old check
+	if PlayerGlobal and PlayerGlobal.get_player() == body and body == target_player: # Ensure it's the correct player exiting
 		target_player = null
+		print_debug("[Boss _on_detection_area_body_exited] Player exited detection area. Target lost.")
+		# Optionally, change state if the boss should stop attacking or moving
+		# if current_state == BossState.MOVE or current_state == BossState.ATTACK:
+		#     _change_state(BossState.IDLE)
 
 func _on_attack_area_body_entered(body: Node2D) -> void:
-	if body.is_in_group("player"):
+	# if body.is_in_group("player"): # Old check
+	if PlayerGlobal and PlayerGlobal.get_player() == body:
 		var damage = attack_damage
 		if current_state == BossState.SPECIAL_ATTACK:
 			damage = special_attack_damage
@@ -510,4 +580,22 @@ func _on_touch_damage_area_body_entered(body: Node2D) -> void:
 			var knockback_force_on_player = knockback_dir * 100
 			if body.has_method("apply_knockback_from_vector"):
 				body.call("apply_knockback_from_vector", knockback_force_on_player)
+
+# Add a handler for PlayerGlobal's signal
+func _on_player_registration_changed(is_registered: bool) -> void:
+	print_debug("[Boss._on_player_registration_changed] Player registration changed. Registered: ", is_registered)
+	if is_registered:
+		target_player = PlayerGlobal.get_player()
+		print_debug("[Boss] Target player updated from PlayerGlobal: ", target_player.name if target_player else "null")
+		# If boss was IDLE because no target, maybe trigger state change
+		if current_state == BossState.IDLE and is_instance_valid(target_player):
+			_change_state(BossState.MOVE) # Or APPEAR, depending on logic
+	else:
+		target_player = null
+		print_debug("[Boss] Target player set to null due to unregistration.")
+		# If boss was targeting player, might need to go to IDLE
+		# This depends on how you want the boss to react when player disappears
+		# For example, if in MOVE or ATTACK state, go to IDLE.
+		if current_state == BossState.MOVE or current_state == BossState.ATTACK or current_state == BossState.SPECIAL_ATTACK:
+			_change_state(BossState.IDLE)
 #endregion 

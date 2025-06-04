@@ -12,17 +12,11 @@
 [ext_resource type="Texture2D" uid="uid://dty33ihtgf4v5" path="res://assets/icons/info/GF/pressed.png" id="10_v6wn0"]
 [ext_resource type="Texture2D" uid="uid://cw2l40uu4sq1m" path="res://assets/icons/info/GF/hover.png" id="11_c4yqt"]
 
-[node name="GameOverScreen" type="Control"]
-layout_mode = 3
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="GameOverScreen" type="CanvasLayer"]
+layer = 10
 script = ExtResource("1_g68e0")
 
 [node name="ColorRect" type="ColorRect" parent="."]
-layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -31,7 +25,6 @@ grow_vertical = 2
 color = Color(0, 0, 0, 0.623529)
 
 [node name="CenterContainer" type="CenterContainer" parent="."]
-layout_mode = 0
 offset_right = 364.0
 offset_bottom = 442.0
 
