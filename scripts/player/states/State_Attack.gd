@@ -86,6 +86,14 @@ func process_physics(delta: float) -> void:
 	player.move_and_slide()
 
 func get_transition() -> PlayerState:
+	# 優先處理跳躍中斷
+	if Input.is_action_just_pressed("jump") and jump_state:
+		# 檢查玩家是否可以跳躍 (在地面上，或者還有剩餘跳躍次數)
+		# 這裡我們假設 player.gd 中有 jump_buffer_timer 來處理跳躍緩衝
+		# 並且 player.gd 的 _physics_process 或相關狀態會處理 jump_count
+		if player.is_on_floor() or player.jump_count < player.max_jumps or player.jump_buffer_timer > 0:
+			return jump_state
+
 	if animation_finished:
 		if Input.is_action_pressed("attack"):
 			if player.current_attack_combo < 2:

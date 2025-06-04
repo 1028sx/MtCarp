@@ -1,4 +1,4 @@
-extends Control
+extends CanvasLayer
 
 @onready var play_time_label = $CenterContainer/VBoxContainer/VBoxContainer_Stats/Label_PlayTime
 @onready var kill_count_label = $CenterContainer/VBoxContainer/VBoxContainer_Stats/Label_KillCount
@@ -6,7 +6,7 @@ extends Control
 @onready var gold_label = $CenterContainer/VBoxContainer/VBoxContainer_Stats/Label_Gold
 @onready var links_label = $CenterContainer/VBoxContainer/HBoxContainer_Links/Label
 
-const DISCORD_ID = "613878521898598531"  # 替換成您的 Discord ID
+const DISCORD_ID = "613878521898598531"
 const GITHUB_URL = "https://github.com/1028sx/graduation_project"
 const FEEDBACK_URL = "https://forms.gle/GzWnzdix2vK2M4747"
 
@@ -25,9 +25,17 @@ func _ready() -> void:
 	github_button.pressed.connect(_on_github_pressed)
 	feedback_button.pressed.connect(_on_feedback_pressed)
 
+	print("[GameOverScreen _ready] Checking node references:")
+	print("  play_time_label is null: ", play_time_label == null)
+	print("  kill_count_label is null: ", kill_count_label == null)
+	print("  max_combo_label is null: ", max_combo_label == null)
+	print("  gold_label is null: ", gold_label == null)
+	print("  links_label is null: ", links_label == null)
+
 func show_screen() -> void:
+	print("[GameOverScreen] show_screen() CALLED. Visible: ", visible, " Time: ", Time.get_ticks_msec())
 	# 顯示統計數據
-	_update_stats()
+	call_deferred("_update_stats")
 	# 顯示畫面
 	show()
 	# 確保遊戲暫停
@@ -42,6 +50,22 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_stats() -> void:
+	print("[GameOverScreen] _update_stats() CALLED. Time: ", Time.get_ticks_msec())
+	# Add null checks before accessing properties
+	if play_time_label == null:
+		printerr("[GameOverScreen _update_stats] Error: play_time_label is null!")
+		return
+	if kill_count_label == null:
+		printerr("[GameOverScreen _update_stats] Error: kill_count_label is null!")
+		return
+	if max_combo_label == null:
+		printerr("[GameOverScreen _update_stats] Error: max_combo_label is null!")
+		return
+	if gold_label == null:
+		printerr("[GameOverScreen _update_stats] Error: gold_label is null!")
+		return
+	# links_label is used in other functions, check there if issues arise.
+
 	var game_manager = get_tree().get_first_node_in_group("game_manager")
 	if game_manager:
 		# 格式化遊戲時間
@@ -60,7 +84,7 @@ func _on_discord_pressed() -> void:
 	DisplayServer.clipboard_set(DISCORD_ID)
 	
 	# 更新提示文字
-	var original_text = links_label.text
+	var original_text = links_label.text # This line might error if links_label is null
 	links_label.text = "已複製使用者ID！"
 	
 	# 創建一個計時器來恢復文字
@@ -71,7 +95,7 @@ func _on_discord_pressed() -> void:
 func _on_github_pressed() -> void:
 	var error = OS.shell_open(GITHUB_URL)
 	if error != OK:
-		links_label.text = "無法開啟 GitHub 連結"
+		links_label.text = "無法開啟 GitHub 連結" # This line might error if links_label is null
 		var timer = get_tree().create_timer(2.0)
 		await timer.timeout
 		links_label.text = ""
@@ -79,7 +103,7 @@ func _on_github_pressed() -> void:
 func _on_feedback_pressed() -> void:
 	var error = OS.shell_open(FEEDBACK_URL)
 	if error != OK:
-		links_label.text = "無法開啟回饋表單連結"
+		links_label.text = "無法開啟回饋表單連結" # This line might error if links_label is null
 		var timer = get_tree().create_timer(2.0)
 		await timer.timeout
 		links_label.text = ""
