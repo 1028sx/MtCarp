@@ -47,3 +47,6 @@ export_presets.cfg
 
 # 原始README檔案（包含敏感資訊）
 ORIGINAL_README.md
+
+# 忽略 godot-mcp 工具目錄
+godot-mcp/
