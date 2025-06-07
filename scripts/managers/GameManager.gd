@@ -1,5 +1,8 @@
 extends Node
 
+# Preload the PlayerGlobal script resource to call static functions from the type
+const PlayerGlobalScript = preload("res://scripts/globals/PlayerGlobal.gd")
+
 # 遊戲狀態
 enum GameState {MENU, PLAYING, PAUSED, GAME_OVER}
 var current_state = GameState.MENU
@@ -66,9 +69,9 @@ func _ready():
 	# var player = get_tree().get_first_node_in_group("player") # Old method
 
 	# 使用 PlayerGlobal 連接玩家信號
-	if PlayerGlobal:
-		if PlayerGlobal.is_player_available(): # 改回使用 Autoload 名稱
-			_connect_to_player_signals(PlayerGlobal.get_player()) # 改回使用 Autoload 名稱
+	if PlayerGlobal: # Keep check for Autoload existence for its non-static signals like player_registration_changed
+		if PlayerGlobalScript.is_player_available(): # Call static function on the script resource
+			_connect_to_player_signals(PlayerGlobalScript.get_player()) # Call static function on the script resource
 		# Connect to the signal for when player registration changes
 		if not PlayerGlobal.player_registration_changed.is_connected(_on_player_registration_changed):
 			PlayerGlobal.player_registration_changed.connect(_on_player_registration_changed)
@@ -239,7 +242,7 @@ func process_loot_effect(effect) -> void:
 	
 	# 獲取玩家引用
 	# var player = get_tree().get_first_node_in_group("player") # Old method
-	var player = PlayerGlobal.get_player() # 改回使用 Autoload 名稱
+	var player = PlayerGlobalScript.get_player() # Call static function on the script resource
 
 	if not player or not player.has_method("apply_effect"):
 		printerr("[GameManager.process_loot_effect] Player not found or missing 'apply_effect' method.")
@@ -337,7 +340,7 @@ func _connect_to_player_signals(player_node: CharacterBody2D) -> void:
 func _on_player_registration_changed(is_registered: bool) -> void:
 	print_debug("[GameManager] Player registration changed. Registered: ", is_registered)
 	if is_registered:
-		var player_node = PlayerGlobal.get_player()
+		var player_node = PlayerGlobalScript.get_player() # Call static function on the script resource
 		if is_instance_valid(player_node):
 			_connect_to_player_signals(player_node)
 		else:
@@ -365,7 +368,7 @@ func reset_room_effects() -> void:
 	if all_drops_once_enabled and all_drops_once_used:
 		all_drops_once_used = false
 
-func show_temporary_message(message: String, duration: float = 2.0) -> void:
+func show_temporary_message(_message: String, _duration: float = 2.0) -> void: # 將未使用的參數加上底線
 	pass # ADDED pass to fix indentation error
 	# ... existing code ...
 
