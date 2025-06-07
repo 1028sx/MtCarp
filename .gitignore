@@ -50,3 +50,6 @@ ORIGINAL_README.md
 
 # 忽略 godot-mcp 工具目錄
 godot-mcp/
+
+# 忽略備份資料夾
+/backups/

@@ -1,5 +1,8 @@
 extends CharacterBody2D
 
+# Preload the PlayerGlobal script resource to call static functions from the type
+const PlayerGlobalScript = preload("res://scripts/globals/PlayerGlobal.gd")
+
 #region 常量定義
 const NORMAL_TIME_SCALE = 1.0
 const CAMERA_MODE_TIME_SCALE = 0.1
@@ -148,7 +151,6 @@ const GROUND_SLAM_DAMAGE_MULTIPLIER := 3.0
 const GROUND_SLAM_KNOCKBACK_FORCE := 150.0
 
 signal health_changed(new_health: int)
-signal died
 signal gold_changed(new_gold: int)
 
 # warning-ignore:unused_signal
@@ -190,10 +192,11 @@ func _ready() -> void:
 	current_attack_damage = base_attack_damage
 	current_special_attack_damage = base_special_attack_damage
 	active_effects = {}
-	emit_signal("effect_changed", active_effects)
+	# emit_signal("effect_changed", active_effects) # 改用以下更直接的方式
+	effect_changed.emit(active_effects)
 
 	# Register with PlayerGlobal
-	if PlayerGlobal:
+	if PlayerGlobal: # Autoload PlayerGlobal 自身
 		PlayerGlobal.register_player(self)
 
 func _physics_process(delta: float) -> void:
@@ -230,7 +233,8 @@ func _input(event: InputEvent) -> void:
 
 func _tree_exiting() -> void:
 	# Unregister from PlayerGlobal when the player is removed from the scene tree
-	if PlayerGlobal and PlayerGlobal.get_player() == self:
+	# if PlayerGlobal and PlayerGlobal.get_player() == self: # 原來的調用方式
+	if PlayerGlobal and PlayerGlobalScript.get_player() == self: # 修改後的調用方式
 		PlayerGlobal.unregister_player()
 
 #endregion
@@ -502,6 +506,8 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		else:
 			printerr("[Player_take_damage] Hurt state not found!")
 			
+		set_invincible(invincible_duration) # 賦予玩家受傷後的無敵時間
+		
 		# 重置因被打斷而應取消的狀態或能力
 		print("[Player_take_damage] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
 		last_jump_was_wall_jump = false
@@ -665,6 +671,7 @@ func apply_effect(effect: Dictionary) -> void:
 		return
 	
 	var effect_type = effect.effect
+	var previous_effects_count = active_effects.size()
 	
 	match effect_type:
 		"life_steal":
@@ -732,6 +739,10 @@ func apply_effect(effect: Dictionary) -> void:
 			has_ice_freeze = true
 			ice_freeze_timer = 0.0
 
+	# 如果效果列表真的改變了，才發出信號
+	if active_effects.size() != previous_effects_count or not active_effects.has(effect_type):
+		effect_changed.emit(active_effects)
+
 func apply_swift_dash() -> void:
 	dash_cooldown *= swift_dash_cooldown_reduction
 	dash_speed *= swift_dash_multiplier
@@ -796,7 +807,10 @@ func get_berserker_multiplier() -> float:
 func reset_all_states() -> void:
 	if active_effects.has("swift_dash"):
 		remove_swift_dash()
+	var effects_were_cleared = not active_effects.is_empty()
 	active_effects.clear()
+	if effects_were_cleared:
+		effect_changed.emit(active_effects)
 	has_dash_wave = false
 	max_jumps = 2
 	

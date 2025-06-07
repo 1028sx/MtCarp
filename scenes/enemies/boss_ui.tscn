@@ -53,20 +53,20 @@ max_value = 1000.0
 value = 1000.0
 texture_under = ExtResource("3_v70hr")
 texture_progress = ExtResource("4_d2q46")
-texture_progress_offset = Vector2(33.485, 0)
+texture_progress_offset = Vector2(31, 0)
 
 [node name="TextureRect_Deer1" type="TextureRect" parent="Control_BossHUD"]
 layout_mode = 0
-offset_left = 366.0
-offset_top = 44.0
-offset_right = 483.0
-offset_bottom = 161.0
+offset_left = 361.0
+offset_top = 45.0
+offset_right = 478.0
+offset_bottom = 162.0
 texture = ExtResource("5_xfprp")
 
 [node name="TextureRect_Deer2" type="TextureRect" parent="Control_BossHUD"]
 layout_mode = 0
-offset_left = 390.0
+offset_left = 386.0
 offset_top = 72.0
-offset_right = 459.0
+offset_right = 455.0
 offset_bottom = 141.0
 texture = ExtResource("6_bt2d3")

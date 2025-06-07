@@ -1229,9 +1229,7 @@ shape = SubResource("CapsuleShape2D_pwo0r")
 position = Vector2(-1, -27)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_pdjgy")
-animation = &"new_animation"
-frame = 3
-frame_progress = 0.218661
+animation = &"attack3"
 
 [node name="GroundSlamArea" type="Area2D" parent="."]
 collision_layer = 32
@@ -1252,6 +1250,7 @@ position = Vector2(-2, 38)
 shape = SubResource("CapsuleShape2D_a6pnd")
 
 [node name="AttackArea" type="Area2D" parent="."]
+visible = false
 collision_layer = 32
 collision_mask = 16
 monitoring = false
@@ -1261,6 +1260,7 @@ script = ExtResource("22_sh46p")
 polygon = PackedVector2Array(-37, -2, 1, 66, 96, 72, 90, 26, 46, -6)
 
 [node name="SpecialAttackArea" type="Area2D" parent="."]
+visible = false
 collision_layer = 32
 collision_mask = 16
 monitoring = false
