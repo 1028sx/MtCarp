@@ -1,4 +1,4 @@
-class_name State_Fall
+class_name state_fall
 extends PlayerState
 
 @export var idle_state: PlayerState
@@ -42,8 +42,8 @@ func get_transition() -> PlayerState:
 		return idle_state
 
 	if player.jump_buffer_timer > 0 and player.jump_count < player.max_jumps:
-		if jump_state is State_Jump:
-			(jump_state as State_Jump).came_from_air_state = true
+		if jump_state is state_jump:
+			(jump_state as state_jump).came_from_air_state = true
 		
 		return jump_state
 	

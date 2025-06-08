@@ -1,4 +1,4 @@
-class_name State_Jump
+class_name state_jump
 extends PlayerState
 
 @export var fall_state: PlayerState
@@ -102,4 +102,4 @@ func get_transition() -> PlayerState:
 	if Input.is_action_just_pressed("dash") and dash_state and player.can_dash and player.dash_cooldown_timer <= 0:
 		return dash_state
 
-	return null
+	return null 

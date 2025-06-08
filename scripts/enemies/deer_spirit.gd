@@ -423,7 +423,7 @@ func apply_damage():
 						body.apply_knockback(knockback)
 
 func _spawn_bullet(direction: Vector2):
-	var bullet = preload("res://scenes/enemies/DeerBullet.tscn").instantiate()
+	var bullet = preload("res://scenes/enemies/deer_bullet.tscn").instantiate()
 	bullet.global_position = global_position
 	bullet.setup(direction, BULLET_SPEED, BULLET_DAMAGE, spirit_color)
 	get_parent().add_child(bullet)

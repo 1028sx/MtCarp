@@ -23,11 +23,13 @@ config/icon="res://icon.svg"
 
 MetSys="*res://addons/MetroidvaniaSystem/Nodes/Singleton.tscn"
 TransitionScreen="*res://scenes/ui/transition_screen.tscn"
-WordSystem="*res://autoload/WordSystem.gd"
-RoomManager="*res://scripts/managers/RoomManager.gd"
-GlobalUi="*res://autoload/GlobalUI.gd"
-GameManager="*res://scripts/managers/GameManager.gd"
+WordSystem="*res://autoload/word_system.gd"
+RoomManager="*res://scripts/managers/room_manager.gd"
+GlobalUi="*res://autoload/global_ui.gd"
+GameManager="*res://scripts/managers/game_manager.gd"
 PlayerGlobal="*res://scripts/globals/PlayerGlobal.gd"
+ItemManager="*res://scripts/managers/item_manager.gd"
+SceneManager="*res://scripts/managers/scene_manager.gd"
 
 [editor]
 
