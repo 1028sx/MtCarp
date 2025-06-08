@@ -35,8 +35,8 @@ func _on_start_button_pressed() -> void:
 	if transition_screen:
 		await transition_screen.fade_to_black()
 		# 確保場景存在
-		if ResourceLoader.exists("res://scenes/Main.tscn"):
-			get_tree().change_scene_to_file("res://scenes/Main.tscn")
+		if ResourceLoader.exists("res://scenes/main.tscn"):
+			get_tree().change_scene_to_file("res://scenes/main.tscn")
 			await transition_screen.fade_from_black()
 		else:
 			push_error("無法找到主場景檔案")

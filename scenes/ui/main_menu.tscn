@@ -103,5 +103,5 @@ texture_pressed = SubResource("AtlasTexture_lnl04")
 texture_hover = SubResource("AtlasTexture_ds0h5")
 stretch_mode = 5
 
-[connection signal="pressed" from="VBoxContainer/HBoxContainer2/StartButton" to="." method="_on_back_button_pressed"]
-[connection signal="pressed" from="VBoxContainer/HBoxContainer/QuitButton" to="." method="_on_back_button_pressed"]
+[connection signal="pressed" from="VBoxContainer/HBoxContainer2/StartButton" to="." method="_on_start_button_pressed"]
+[connection signal="pressed" from="VBoxContainer/HBoxContainer/QuitButton" to="." method="_on_quit_button_pressed"]

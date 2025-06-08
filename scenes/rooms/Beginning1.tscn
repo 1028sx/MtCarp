@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" uid="uid://b4umvs1a7ueba" path="res://scenes/rooms/door.tscn" id="3_kknwu"]
 [ext_resource type="PackedScene" uid="uid://8022g12qnv2t" path="res://scenes/rooms/parallax_background.tscn" id="4_snsjn"]
 [ext_resource type="PackedScene" uid="uid://b4t22ugqdu7jp" path="res://scenes/ui/loot.tscn" id="6_w8xat"]
-[ext_resource type="PackedScene" uid="uid://dbt8ov2umye2h" path="res://scenes/enemies/BossFish.tscn" id="7_k8joo"]
+[ext_resource type="PackedScene" uid="uid://dbt8ov2umye2h" path="res://scenes/enemies/boss/giant_fish.tscn" id="7_k8joo"]
 [ext_resource type="PackedScene" uid="uid://o34sti441w5s" path="res://scenes/rooms/death_zone.tscn" id="7_my7d8"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_w7uvy"]

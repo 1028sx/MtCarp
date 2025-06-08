@@ -1,4 +1,4 @@
-class_name State_Run
+class_name state_run
 extends PlayerState
 
 @export var idle_state: PlayerState

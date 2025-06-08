@@ -54,7 +54,7 @@ const HEIGHT_THRESHOLD = -150.0  # 高度差閾值，超過這個值才考慮跳
 @onready var hitbox = $Hitbox
 @onready var attack_timer = $AttackTimer
 @onready var effect_manager = $EffectManager  # 新增：特效管理器引用
-var spirit_scene = preload("res://scenes/enemies/DeerSpirit.tscn")
+var spirit_scene = preload("res://scenes/enemies/deer_spirit.tscn")
 #endregion
 
 #region 狀態變量
@@ -497,7 +497,7 @@ func perform_ranged_attack():
 		animated_sprite.play()
 
 func _spawn_bullet(direction: Vector2):
-	var bullet = preload("res://scenes/enemies/DeerBullet.tscn").instantiate()
+	var bullet = preload("res://scenes/enemies/deer_bullet.tscn").instantiate()
 	bullet.global_position = global_position
 	bullet.setup(direction, BULLET_SPEED, BULLET_DAMAGE)
 	get_parent().add_child(bullet)

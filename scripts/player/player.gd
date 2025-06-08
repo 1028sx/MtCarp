@@ -181,6 +181,7 @@ var ice_freeze_duration := 2.0
 var is_wall_sliding := false
 var last_jump_was_wall_jump := false
 var is_double_jumping_after_wall_jump := false
+var _took_damage_this_frame := false
 #endregion
 
 #region 生命週期函數
@@ -200,6 +201,7 @@ func _ready() -> void:
 		PlayerGlobal.register_player(self)
 
 func _physics_process(delta: float) -> void:
+	_took_damage_this_frame = false
 	if _handle_camera_mode(delta):
 		return
 		
@@ -289,11 +291,11 @@ func _connect_signals() -> void:
 	if effect_manager and not effect_manager.effect_finished.is_connected(_on_effect_finished):
 		effect_manager.effect_finished.connect(_on_effect_finished)
 
-func _connect_death_state_signal():
+func _connect_death_state_signal() -> void:
 	# 使用 call_deferred 確保狀態機和狀態節點已準備好
 	call_deferred("_deferred_connect_death_state_signal")
 
-func _deferred_connect_death_state_signal():
+func _deferred_connect_death_state_signal() -> void:
 	if state_machine and state_machine.states.has("dead"):
 		var dead_state = state_machine.states.get("dead") # 使用 .get() 更安全
 		if is_instance_valid(dead_state): # 檢查實例是否有效
@@ -308,9 +310,9 @@ func _deferred_connect_death_state_signal():
 	else:
 		printerr("[Player] Could not find 'dead' state in StateMachine to connect signal in _deferred_connect_death_state_signal.")
 
+# 這是 state_dead 動畫播放完畢後的回調
 func _on_death_animation_truly_finished():
-	# 這是 State_Dead 動畫播放完畢後的回調
-	print_debug("[Player] Death animation truly finished (received from State_Dead). Emitting player_fully_died.")
+	print_debug("[Player] Death animation truly finished (received from state_dead). Emitting player_fully_died.")
 	player_fully_died.emit()
 
 #endregion
@@ -412,11 +414,11 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		print("- Attacker: null (Damage might be environmental or self-inflicted)")
 	print("- Current Player State: ", String(state_machine.current_state.name) if state_machine and state_machine.current_state else "N/A")
 	print("- Is Invincible Flag: ", is_invincible)
-	print("- Is Dashing (State Check): ", str(state_machine.current_state is State_Dash) if state_machine and state_machine.current_state else "N/A")
+	print("- Is Dashing (State Check): ", str(state_machine.current_state is state_dash) if state_machine and state_machine.current_state else "N/A")
 	print("--------------------------------------------------")
 
 	# 1. Check for full invincibility (Dash or general invincible flag)
-	if is_invincible or (state_machine and state_machine.current_state is State_Dash):
+	if is_invincible or (state_machine and state_machine.current_state is state_dash):
 		print("[Player_take_damage] Damage ignored due to invincibility or Dash state.")
 		return # No damage, no effects, no interruption
 		
@@ -488,7 +490,7 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 	# 6. Handle interruption vs Super Armor (only if not dead and not invincible/dashing)
 	var has_super_armor = false
 	# 檢查當前狀態是否提供霸體 (目前只有 SpecialAttack)
-	if state_machine and state_machine.current_state is State_Special_Attack:
+	if state_machine and state_machine.current_state is state_special_attack:
 		has_super_armor = true
 
 	if not has_super_armor:
@@ -506,7 +508,8 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		else:
 			printerr("[Player_take_damage] Hurt state not found!")
 			
-		set_invincible(invincible_duration) # 賦予玩家受傷後的無敵時間
+		# set_invincible(invincible_duration) # 這行現在是多餘的，因為我們在 area_entered 中已經設置了
+		set_invincible(invincible_duration) # 將無敵時間的賦予移回到這裡
 		
 		# 重置因被打斷而應取消的狀態或能力
 		print("[Player_take_damage] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
@@ -554,12 +557,15 @@ func _on_ani_sprite_2d_frame_changed() -> void:
 		state_machine.current_state.on_frame_changed(animated_sprite.frame)
 
 func _on_hitbox_area_entered(area: Area2D) -> void:
-	if is_invincible or (state_machine and state_machine.current_state is State_Dash):
+	if is_invincible or (state_machine and state_machine.current_state is state_dash) or _took_damage_this_frame:
 		return
 		
 	if area.get_parent().is_in_group("enemy"):
 		var enemy = area.get_parent()
 		var damage_amount = enemy.damage if "damage" in enemy else 10
+		
+		# 標記本影格已處理傷害，防止重複觸發
+		_took_damage_this_frame = true
 		take_damage(damage_amount, enemy)
 
 func _on_effect_finished() -> void:
