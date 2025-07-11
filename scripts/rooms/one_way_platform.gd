@@ -17,6 +17,8 @@ func _ready() -> void:
 	collision_shape.one_way_collision = true  # 設置為單向碰撞
 	collision_shape.one_way_collision_margin = 8  # 設置單向碰撞邊緣
 	platform_collision.add_child(collision_shape)
+	# 將平台自身加入群組，以便 AI 識別
+	platform_collision.add_to_group("one_way_platform")
 	add_child(platform_collision)
 
 func _physics_process(_delta: float) -> void:

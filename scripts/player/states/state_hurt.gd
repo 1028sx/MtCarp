@@ -1,3 +1,4 @@
+class_name state_hurt
 extends PlayerState
 
 @export var hurt_duration = 0.3

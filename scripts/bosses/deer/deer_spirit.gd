@@ -48,8 +48,8 @@ const COLOR_SETTINGS = {
 #endregion
 
 #region 狀態變量
-enum State {IDLE, MOVE, JUMP, ATTACK1, ATTACK2, RANGED, HURT, DIE}
-var current_state = State.IDLE
+enum DeerState {IDLE, MOVE, JUMP, ATTACK1, ATTACK2, RANGED, HURT, DIE}
+var current_state = DeerState.IDLE
 var is_dying = false
 var has_jumped = false
 var chase_timer = 0.0
@@ -152,7 +152,7 @@ func _physics_process(delta):
 	_apply_movement()
 	
 	# 檢查攻擊
-	if current_state in [State.ATTACK1, State.ATTACK2]:
+	if current_state in [DeerState.ATTACK1, DeerState.ATTACK2]:
 		apply_damage()
 
 func _apply_gravity(delta):
@@ -161,21 +161,21 @@ func _apply_gravity(delta):
 
 func _handle_state(delta):
 	match current_state:
-		State.IDLE:
+		DeerState.IDLE:
 			idle_state()
-		State.MOVE:
+		DeerState.MOVE:
 			move_state(delta)
-		State.JUMP:
+		DeerState.JUMP:
 			jump_state()
-		State.ATTACK1:
+		DeerState.ATTACK1:
 			attack1_state()
-		State.ATTACK2:
+		DeerState.ATTACK2:
 			attack2_state()
-		State.RANGED:
+		DeerState.RANGED:
 			ranged_state()
-		State.HURT:
+		DeerState.HURT:
 			hurt_state()
-		State.DIE:
+		DeerState.DIE:
 			die_state()
 
 func _apply_movement():
@@ -194,12 +194,12 @@ func idle_state():
 		animated_sprite.play("idle")
 	
 	if target_player:
-		change_state(State.MOVE)
+		change_state(DeerState.MOVE)
 
 func move_state(delta):
 	# 如果沒有目標玩家，保持閒置
 	if not target_player:
-		change_state(State.IDLE)
+		change_state(DeerState.IDLE)
 		return
 	
 	# 計算與玩家的距離和方向
@@ -220,9 +220,9 @@ func move_state(delta):
 	if distance <= MELEE_RANGE and attack_timer.is_stopped():
 		# 在近戰範圍內立即攻擊
 		if randf() < 0.7:  # 鹿精靈更偏好攻擊1
-			change_state(State.ATTACK1)
+			change_state(DeerState.ATTACK1)
 		else:
-			change_state(State.ATTACK2)
+			change_state(DeerState.ATTACK2)
 		attack_timer.start()
 		return
 	
@@ -242,7 +242,7 @@ func move_state(delta):
 			can_jump = true
 		
 		if can_jump and current_time - last_jump_time >= JUMP_COOLDOWN and jump_attempt_count < MAX_JUMP_ATTEMPTS:
-			change_state(State.JUMP)
+			change_state(DeerState.JUMP)
 			last_jump_time = current_time
 			jump_attempt_count += 1
 			attack_timer.start(attack_cooldown)
@@ -250,7 +250,7 @@ func move_state(delta):
 		elif jump_attempt_count >= MAX_JUMP_ATTEMPTS:
 			# 如果跳躍次數過多，改用遠程攻擊
 			if attack_timer.is_stopped():
-				change_state(State.RANGED)
+				change_state(DeerState.RANGED)
 				jump_attempt_count = 0
 				attack_timer.start(attack_cooldown * 1.5)  # 較長的冷卻時間
 				return
@@ -262,7 +262,7 @@ func move_state(delta):
 	# 如果追逐時間過長，使用遠程攻擊
 	if chase_timer >= CHASE_TIME_LIMIT and attack_timer.is_stopped():
 		chase_timer = 0.0
-		change_state(State.RANGED)
+		change_state(DeerState.RANGED)
 		attack_timer.start(attack_cooldown)
 		return
 	
@@ -300,7 +300,7 @@ func jump_state():
 	# 落地檢測
 	if is_on_floor() and velocity.y >= 0 and has_jumped:
 		has_jumped = false
-		change_state(State.MOVE)
+		change_state(DeerState.MOVE)
 
 func attack1_state():
 	velocity.x = 0
@@ -361,7 +361,7 @@ func ranged_state():
 		await get_tree().create_timer(ATTACK2_RECOVERY).timeout
 		is_performing_ranged = false
 		attack_timer.start(attack_cooldown)
-		change_state(State.MOVE)
+		change_state(DeerState.MOVE)
 
 func hurt_state():
 	velocity.x = 0
@@ -404,9 +404,9 @@ func take_damage(_damage: int) -> void:  # 接收傷害參數但忽略它
 	modulate.a = current_alpha
 	
 	if hits_remaining <= 0:
-		change_state(State.DIE)
+		change_state(DeerState.DIE)
 	else:
-		change_state(State.HURT)
+		change_state(DeerState.HURT)
 
 func apply_damage():
 	if attack_area and attack_area.monitoring:
@@ -423,7 +423,7 @@ func apply_damage():
 						body.apply_knockback(knockback)
 
 func _spawn_bullet(direction: Vector2):
-	var bullet = preload("res://scenes/enemies/deer_bullet.tscn").instantiate()
+	var bullet = preload("res://scenes/bosses/deer/deer_bullet.tscn").instantiate()
 	bullet.global_position = global_position
 	bullet.setup(direction, BULLET_SPEED, BULLET_DAMAGE, spirit_color)
 	get_parent().add_child(bullet)
@@ -433,24 +433,24 @@ func _spawn_bullet(direction: Vector2):
 func _on_detection_area_body_entered(body: Node2D):
 	if body.is_in_group("player"):
 		target_player = body
-		if current_state == State.IDLE:
-			change_state(State.MOVE)
+		if current_state == DeerState.IDLE:
+			change_state(DeerState.MOVE)
 
 func _on_detection_area_body_exited(body: Node2D):
 	if body.is_in_group("player") and body == target_player:
 		target_player = null
-		change_state(State.IDLE)
+		change_state(DeerState.IDLE)
 
 func _on_attack_timer_timeout():
 	can_attack = true
 	# 如果還在近戰範圍內，立即開始新的攻擊
-	if target_player and current_state != State.DIE:
+	if target_player and current_state != DeerState.DIE:
 		var distance = global_position.distance_to(target_player.global_position)
 		if distance <= MELEE_RANGE:
 			if randf() < 0.7:
-				change_state(State.ATTACK1)
+				change_state(DeerState.ATTACK1)
 			else:
-				change_state(State.ATTACK2)
+				change_state(DeerState.ATTACK2)
 			attack_timer.start()
 
 func _on_animated_sprite_animation_finished():
@@ -461,11 +461,11 @@ func _on_animated_sprite_animation_finished():
 		"die":
 			queue_free()
 		"hurt":
-			change_state(State.MOVE)
+			change_state(DeerState.MOVE)
 		"attack1", "attack2":
 			if attack_area:
 				attack_area.monitoring = false
-			change_state(State.MOVE)
+			change_state(DeerState.MOVE)
 
 func _on_animated_sprite_frame_changed():
 	if not animated_sprite:
@@ -476,8 +476,8 @@ func _on_animated_sprite_frame_changed():
 			if animated_sprite.frame == 3:  # 攻擊判定
 				apply_damage()
 
-func change_state(new_state: State):
-	if is_dying and new_state != State.DIE:
+func change_state(new_state: DeerState):
+	if is_dying and new_state != DeerState.DIE:
 		return
 		
 	current_state = new_state
@@ -486,7 +486,7 @@ func apply_knockback(force_vector: Vector2) -> void:
 	knockback_velocity = force_vector
 	# 考慮是否在此處轉換到 HURT 狀態
 	# if current_state != State.HURT and current_state != State.DIE:
-	# 	change_state(State.HURT)
+	# 	_change_deer_state(State.HURT)
 #endregion
 
 #region 死亡處理
@@ -522,7 +522,7 @@ func perform_phase_two_attack():
 		await tween.finished
 		
 		# 執行遠程攻擊
-		change_state(State.RANGED)
+		change_state(DeerState.RANGED)
 		await get_tree().create_timer(2.0).timeout
 		
 		# 返回原位

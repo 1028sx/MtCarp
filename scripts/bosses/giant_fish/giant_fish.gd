@@ -1,4 +1,4 @@
-extends "res://scripts/enemies/boss/boss_base.gd"
+extends "res://scripts/bosses/boss_base.gd"
 
 class_name GiantFish
 
@@ -8,6 +8,7 @@ const ACTION_SIDE_MOVE_ATTACK = "SideMoveAttack"
 const ACTION_JUMP_ATTACK = "JumpAttack"        
 const ACTION_TAIL_SWIPE_ATTACK = "TailSwipeAttack"
 const ACTION_BUBBLE_ATTACK = "BubbleAttack"
+const ACTION_REPOSITION = "Reposition" # 新增：重新佈局動作
 #endregion
 
 #region 巨魚特有狀態
@@ -27,7 +28,9 @@ enum GiantFishState {
 	# 吐泡泡攻擊狀態
 	BUBBLE_ATTACK_STATE, 
 	# 左右移動攻擊狀態 (對應 ACTION_SIDE_MOVE_ATTACK)
-	SIDE_MOVE_ATTACK_STATE 
+	SIDE_MOVE_ATTACK_STATE,
+	# 新增：重新佈局狀態
+	REPOSITION_STATE 
 }
 #endregion
 
@@ -57,6 +60,10 @@ enum GiantFishState {
 @export var bubbles_per_attack_phase1: int = 5
 @export var bubbles_per_attack_phase2: int = 7
 @export var charge_speed_multiplier: float = 3.0
+@export var reposition_speed_multiplier: float = 1.5 # 新增：重新佈局時的移動速度
+
+@export_group("Giant Fish Behavior - Phase Transition")
+@export var phase_transition_duration: float = 2.0 
 
 @export_group("Mercy Mechanism")
 @export var mercy_period: float = 10.0
@@ -78,6 +85,8 @@ var _is_at_jump_apex: bool = false
 var _jump_apex_hold_timer: float = 0.0
 var _previous_jump_velocity_y: float = 0.0
 var _tail_swipe_state_timer: float = 0.0
+var _phase_transition_timer: float = 0.0
+var _reposition_duration: float = 0.0 # 新增：重新佈局計時器
 
 var half_body_move_direction: int = 1
 var half_body_moves_done: int = 0
@@ -93,12 +102,20 @@ var _return_target_x: float = 0.0
 # 權重系統變數
 var available_actions: Array[Dictionary] = []
 var last_action_execution_times: Dictionary = {}
+var last_action_name: String = "" # 新增：記錄上一個執行的動作
 var initial_max_health: float = 0.0
 var consecutive_idle_count: int = 0
 const MAX_CONSECUTIVE_IDLE: int = 2
 
 # 新增一個旗標，用於判斷是否在受傷後應該立即反擊
 var is_counter_attack_pending: bool = false
+
+# 連招系統變數
+var is_in_combo: bool = false
+var combo_library: Dictionary = {}
+var current_combo: Array = []
+var current_combo_action_index: int = 0
+const COMBO_START_CHANCE: float = 0.4 # 40% 的機率在待機時嘗試發動連招
 #endregion
 
 
@@ -109,6 +126,7 @@ func _ready() -> void:
 	current_state = GiantFishState.APPEAR 
 	mercy_period_timer = mercy_period
 	_gfb_initialize_available_actions()
+	_gfb_initialize_combo_library()
 	
 	if attack_cooldown_timer:
 		attack_cooldown_timer.wait_time = self.attack_cooldown 
@@ -143,8 +161,12 @@ func _physics_process(delta: float) -> void:
 		GiantFishState.TAIL_SWIPE: 
 			_giant_fish_tail_swipe_state(delta) 
 		GiantFishState.BUBBLE_ATTACK_STATE:
-			_giant_fish_bubble_attack_state(delta) 
-		GiantFishState.APPEAR, GiantFishState.MOVE, GiantFishState.HURT, GiantFishState.PHASE_TRANSITION:
+			_giant_fish_bubble_attack_state(delta)
+		GiantFishState.PHASE_TRANSITION:
+			_giant_fish_phase_transition_state(delta)
+		GiantFishState.REPOSITION_STATE:
+			_giant_fish_reposition_state(delta)
+		GiantFishState.APPEAR, GiantFishState.MOVE, GiantFishState.HURT:
 			# Let superclass handle or add specific logic if any
 			pass # Assuming super._physics_process handles the logic for these states if not overridden by specific _giant_fish_..._state_logic
 
@@ -168,7 +190,7 @@ func _giant_fish_side_move_attack_state(_delta: float):
 		if ( (half_body_move_direction > 0 and global_position.x >= _return_target_x) or
 			 (half_body_move_direction < 0 and global_position.x <= _return_target_x) or
 			 abs(global_position.x - _return_target_x) < 15.0 ):
-			_change_state(GiantFishState.IDLE)
+			_gfb_on_action_finished()
 			return
 	elif is_on_wall():
 		var current_hit_x = global_position.x
@@ -295,26 +317,37 @@ func _giant_fish_emerge_jump_state(delta: float):
 	if is_on_floor():
 		velocity.x = 0 
 		_is_at_jump_apex = false
-		_change_state(GiantFishState.IDLE)
+		_gfb_on_action_finished()
 		return
 	elif _emerge_jump_air_timer >= emerge_jump_max_air_time:
 		velocity.x = 0 
 		velocity.y = 0 
 		_is_at_jump_apex = false
-		_change_state(GiantFishState.IDLE)
+		_gfb_on_action_finished()
 		return
 
 func _giant_fish_tail_swipe_state(delta: float):
 	_tail_swipe_state_timer += delta
 	if _tail_swipe_state_timer >= tail_swipe_duration:
-		_change_state(GiantFishState.IDLE)
+		_gfb_on_action_finished()
 
 
 func _giant_fish_bubble_attack_state(delta: float):
 	_bubble_attack_state_timer += delta
 	if _bubble_attack_state_timer >= bubble_attack_duration:
-		_change_state(GiantFishState.IDLE)
+		_gfb_on_action_finished()
 
+func _giant_fish_phase_transition_state(delta: float):
+	_phase_transition_timer += delta
+	# 在這裡可以加入無敵、特效等邏輯
+	if _phase_transition_timer >= phase_transition_duration:
+		# 階段轉換演出結束，正式開始P2的連招
+		print_debug("[GiantFish AI] Phase transition duration finished. Starting 'PhaseTransitionOpener' combo.")
+		_start_combo("PhaseTransitionOpener")
+
+func _giant_fish_reposition_state(_delta: float) -> void:
+	# (此為預留空位，邏輯將在後續步驟中填充)
+	pass
 #endregion
 
 #region 攻擊準備/執行函式
@@ -336,6 +369,10 @@ func _prepare_bubble_attack():
 	_spawn_bubbles_for_action()
 	_bubble_attack_state_timer = 0.0
 	_change_state(GiantFishState.BUBBLE_ATTACK_STATE)
+
+func _prepare_reposition() -> void:
+	# (此為預留空位，邏輯將在後續步驟中填充)
+	pass
 
 func _prepare_idle():
 	_change_state(GiantFishState.IDLE)
@@ -373,6 +410,76 @@ func _prepare_emerge_jump():
 	_previous_jump_velocity_y = emerge_jump_initial_y_velocity
 	_change_state(GiantFishState.EMERGE_JUMP)
 
+#endregion
+
+#region 連招系統核心函式 (新)
+func _gfb_initialize_combo_library() -> void:
+	# 定義 BOSS 的所有連招組合
+	# 鍵 (Key) 是連招的名稱，值 (Value) 是一個包含動作常量的陣列
+	
+	# 連招 A: 壓迫與突襲 (將玩家逼到角落後，發動突襲)
+	combo_library["PressureCombo"] = {
+		"actions": [ACTION_SIDE_MOVE_ATTACK, ACTION_JUMP_ATTACK],
+		"condition": func(): return _is_player_in_corner()
+	}
+	
+	# 連招 B: 近身作戰 (結合近距離的甩尾和遠程的泡泡)
+	combo_library["CloseQuartersCombo"] = {
+		"actions": [ACTION_TAIL_SWIPE_ATTACK, ACTION_BUBBLE_ATTACK],
+		"condition": func(): return _is_player_close(250.0)
+	}
+	
+	# 連招 C: 階段轉換專用 (一個更具威脅性的組合，作為 P2 的開場)
+	combo_library["PhaseTransitionOpener"] = {
+		"actions": [ACTION_JUMP_ATTACK, ACTION_TAIL_SWIPE_ATTACK],
+		"condition": func(): return true # P2開場必定執行，無特殊條件
+	}
+	
+	print_debug("[ComboSystem] Combo library initialized with %d combos." % combo_library.size())
+
+
+func _start_combo(combo_name: String) -> void:
+	if not combo_library.has(combo_name):
+		printerr("[ComboSystem] Attempted to start non-existent combo: ", combo_name)
+		_change_state(GiantFishState.IDLE)
+		return
+	
+	print_debug("[ComboSystem] Starting combo: ", combo_name)
+	is_in_combo = true
+	current_combo = combo_library[combo_name]["actions"]
+	current_combo_action_index = 0
+	_execute_next_combo_action()
+
+func _execute_next_combo_action() -> void:
+	if not is_in_combo or current_combo_action_index >= current_combo.size():
+		_end_combo()
+		return
+
+	var next_action_name = current_combo[current_combo_action_index]
+	print_debug("[ComboSystem] Executing combo action %d: %s" % [current_combo_action_index + 1, next_action_name])
+	
+	current_combo_action_index += 1
+	_prepare_action_by_state(next_action_name)
+
+func _end_combo() -> void:
+	if not is_in_combo:
+		return
+	
+	print_debug("[ComboSystem] Combo finished.")
+	is_in_combo = false
+	current_combo = []
+	current_combo_action_index = 0
+	_change_state(GiantFishState.IDLE) # 連招結束後返回待機
+
+func _gfb_on_action_finished() -> void:
+	"""
+	一個動作（如揮尾、衝刺）完成後被呼叫。
+	用來決定是繼續連招的下一步，還是轉換到待機狀態。
+	"""
+	if is_in_combo:
+		_execute_next_combo_action()
+	else:
+		_change_state(GiantFishState.IDLE)
 #endregion
 
 #region 水花、波浪、泡泡的產生函式
@@ -435,6 +542,55 @@ func _spawn_bubbles_for_action():
 
 #endregion
 
+#region 輔助函式 (新)
+
+func _is_player_in_corner(corner_threshold_percent: float = 0.2) -> bool:
+	"""檢查玩家是否被逼到地圖角落。"""
+	if not is_instance_valid(target_player) or not _map_width_calculated:
+		return false
+	
+	var map_width = _map_edge_right_x - _map_edge_left_x
+	if map_width <= 0: return false
+	
+	var corner_threshold_pixels = map_width * corner_threshold_percent
+	var player_x = target_player.global_position.x
+	
+	return player_x < _map_edge_left_x + corner_threshold_pixels or \
+		   player_x > _map_edge_right_x - corner_threshold_pixels
+
+
+func _is_player_close(distance: float) -> bool:
+	"""檢查玩家與 BOSS 的距離是否小於指定值。"""
+	if not is_instance_valid(target_player):
+		return false
+	return global_position.distance_to(target_player.global_position) <= distance
+
+
+func _get_player_context() -> Dictionary:
+	"""
+	收集關於玩家的即時戰術資訊，供 AI 決策系統使用。
+	這是為了解決 AI 權重計算系統無法獲取玩家資訊的潛在錯誤。
+	"""
+	if not is_instance_valid(target_player):
+		return {"is_valid": false}
+		
+	var distance = global_position.distance_to(target_player.global_position)
+	
+	# 定義與 AI 邏輯一致的距離閾值
+	var close_threshold = 300.0
+	var far_threshold = 600.0
+	
+	var context = {
+		"is_valid": true,
+		"distance": distance,
+		"is_close": distance <= close_threshold,
+		"is_far": distance >= far_threshold,
+		"is_in_corner": _is_player_in_corner(),
+		"position": target_player.global_position
+	}
+	return context
+#endregion
+
 #region 仁慈機制與階段轉換
 func _update_mercy_mechanism(delta: float):
 	mercy_period_timer -= delta
@@ -449,11 +605,10 @@ func _update_mercy_mechanism(delta: float):
 
 
 func take_damage(damage: float, attacker: Node, _knockback_info: Dictionary = {}) -> void:
-	if current_state == GiantFishState.APPEAR:
-		return
-
+	# 恢復對 super.take_damage 的呼叫，以修復打斷和血條信號問題
+	# 並且只傳遞父類別需要的參數
 	super.take_damage(damage, attacker)
-
+	
 	if current_health <= 0:
 		return
 
@@ -467,33 +622,57 @@ func take_damage(damage: float, attacker: Node, _knockback_info: Dictionary = {}
 #endregion
 
 #region 狀態改變
+func _reset_state_specific_variables() -> void:
+	# 重置計時器
+	_dive_state_timer = 0.0
+	_bubble_attack_state_timer = 0.0
+	_tail_swipe_state_timer = 0.0
+	submerged_move_current_timer = 0.0
+	_emerge_jump_air_timer = 0.0
+	_jump_apex_hold_timer = 0.0
+	
+	# 重置旗標和計數器
+	_is_at_jump_apex = false
+	_is_returning_to_center = false
+	half_body_moves_done = 0
+	action_has_spawned_bubbles_in_phase2 = false
+
+	# 重置其他變數
+	_previous_jump_velocity_y = 0.0
+
 func _change_state(new_state: int) -> void:
-	# 為了避免在日誌中看到重複的狀態切換（例如 HURT -> HURT），增加此判斷
 	if current_state == new_state:
 		return
 		
-	var old_state_name = "UNKNOWN"
-	var new_state_name = "UNKNOWN"
-	var old_state_idx = GiantFishState.values().find(current_state)
-	var new_state_idx = GiantFishState.values().find(new_state)
-
-	if old_state_idx != -1: old_state_name = GiantFishState.keys()[old_state_idx]
-	if new_state_idx != -1: new_state_name = GiantFishState.keys()[new_state_idx]
+	# 最終修復：使用 .find_key() 來安全、正確地獲取 enum 的名稱
+	var old_state_name = GiantFishState.find_key(current_state)
+	if old_state_name == null: old_state_name = "UNKNOWN (%d)" % current_state
 	
-	print_debug("[State Change] %s -> %s" % [old_state_name, new_state_name])
+	var new_state_name = GiantFishState.find_key(new_state)
+	if new_state_name == null: new_state_name = "UNKNOWN (%d)" % new_state
 
-	# 將狀態設定的權力完全交給父類別，子類別不再重複設定
-	super._change_state(new_state)
+	print("[GiantFish AI] State Change: %s -> %s" % [old_state_name, new_state_name])
 
-	# 移除子類別中重複的狀態設定，這是導致狀態混亂的根源
-	# previous_state = current_state  <- REMOVED
-	# current_state = new_state     <- REMOVED
+	# 核心修復：只在父類別認識該狀態時才呼叫 super._change_state
+	# 這樣可以防止父類別處理它不認識的子類別狀態，從而避免狀態混亂
+	if new_state in BossBase.BossState.values():
+		super._change_state(new_state)
+	else:
+		# 如果是子類別特有的狀態，則手動在子類別中設定
+		previous_state = current_state
+		current_state = new_state
+
+	self._reset_state_specific_variables()
 	
 	match new_state:
 		GiantFishState.IDLE:
 			velocity = Vector2.ZERO
 			if attack_cooldown_timer and attack_cooldown_timer.is_stopped():
 				attack_cooldown_timer.start()
+			# 核心修復：確保每次返回待機狀態時，都重置無敵狀態，使其變為可受傷
+			vulnerable = true
+			is_invincible = false
+			can_be_interrupted = true
 				
 		GiantFishState.DIVE:
 			velocity = Vector2.ZERO
@@ -504,6 +683,22 @@ func _change_state(new_state: int) -> void:
 		GiantFishState.PHASE_TRANSITION:
 			is_phase_two = true
 			current_phase = 2
+			_phase_transition_timer = 0.0
+			can_be_interrupted = false
+			
+			# 動態設定轉場時間，使其與動畫長度同步
+			if animated_sprite and animated_sprite.sprite_frames.has_animation("phase_transition"):
+				# 修正：使用正確的公式（總幀數 / 播放速度）來計算動畫總時長
+				var frame_count = animated_sprite.sprite_frames.get_frame_count("phase_transition")
+				var speed = animated_sprite.sprite_frames.get_animation_speed("phase_transition")
+				if speed > 0:
+					self.phase_transition_duration = frame_count / speed
+					print_debug("[GiantFish AI] Phase transition duration dynamically set to animation length: %.2f sec" % self.phase_transition_duration)
+				else:
+					printerr("'phase_transition' animation speed is 0. Falling back to default duration.")
+			else:
+				# 如果真的找不到動畫，使用預設值以防崩潰
+				printerr("Could not find 'phase_transition' animation. Falling back to default duration.")
 			
 		GiantFishState.SIDE_MOVE_ATTACK_STATE:
 			can_be_interrupted = false
@@ -546,32 +741,12 @@ func _on_defeated():
 
 func _gfb_initialize_available_actions() -> void: 
 	available_actions = [
-		# 行動字典結構:
-		# {
-		# "name": String (行動的唯一標識),
-		# "function_name": String (實際執行此行動的函數名，在 _prepare_action_by_state 中使用),
-		# "base_weight": float (基礎權重),
-		# "min_interval": float (最小觸發間隔，秒),
-		# "phases": Array[int] (允許執行的階段, e.g., [1, 2]),
-		# "conditions": Dictionary (其他觸發條件，例如與玩家的距離、Boss血量百分比等)
-		# Optional: "disabled_by_action": String (如果上一個動作是這個，則禁用此動作)
-		# "is_counter_attack": bool (此招式是否可用於反擊)
-		# }
-
-		# 空閒狀態 (通常權重較低，作為後備)
-		{"name": ACTION_IDLE, "function_name": "_prepare_idle", "base_weight": 0.05, "min_interval": 0.0, "phases": [1, 2], "conditions": {}, "is_counter_attack": false},
-		
-		# 左右移動衝撞 (階段一、二) - 設為反擊招式
-		{"name": ACTION_SIDE_MOVE_ATTACK, "function_name": "_prepare_half_body_move", "base_weight": 1.0, "min_interval": 5.0, "phases": [1, 2], "conditions": {"min_player_dist": 250.0, "max_player_dist": 1200.0}, "is_counter_attack": true},
-		
-		# 跳躍攻擊 (階段一、二) - 不設為反擊招式
-		{"name": ACTION_JUMP_ATTACK, "function_name": "_prepare_jump_attack", "base_weight": 0.8, "min_interval": 6.0, "phases": [1, 2], "conditions": {"min_player_dist": 150.0, "max_player_dist": 800.0}, "is_counter_attack": false},
-		
-		# 擺尾掀起波浪 (階段一、二) - 設為反擊招式
-		{"name": ACTION_TAIL_SWIPE_ATTACK, "function_name": "_prepare_tail_swipe_attack", "base_weight": 0.7, "min_interval": 4.0, "phases": [1, 2], "conditions": {"max_player_dist": 400.0}, "is_counter_attack": true},
-		
-		# 吐泡泡攻擊 (階段一特有) - 可被打斷，不設為反擊招式
-		{"name": ACTION_BUBBLE_ATTACK, "function_name": "_prepare_bubble_attack", "base_weight": 0.6, "min_interval": 4.0, "phases": [1], "conditions": {"min_player_dist": 150.0, "max_player_dist": 600.0}, "is_counter_attack": false}
+		{"name": ACTION_IDLE, 			"function_name": "_prepare_idle", 			"weight": 0.1, "min_cooldown": 0.5, "is_utility": true},
+		{"name": ACTION_REPOSITION, 	"function_name": "_prepare_reposition", 	"weight": 0.5, "min_cooldown": 6.0, "is_utility": true},
+		{"name": ACTION_SIDE_MOVE_ATTACK, "function_name": "_prepare_half_body_move", 	"weight": 1.0, "min_cooldown": 8.0, "tags": ["aggressive"]},
+		{"name": ACTION_JUMP_ATTACK, 		"function_name": "_prepare_jump_attack", 		"weight": 1.0, "min_cooldown": 10.0, "tags": ["aggressive", "far_range"]},
+		{"name": ACTION_TAIL_SWIPE_ATTACK, "function_name": "_prepare_tail_swipe_attack", "weight": 1.0, "min_cooldown": 6.0, "tags": ["close_range"]},
+		{"name": ACTION_BUBBLE_ATTACK, 	"function_name": "_prepare_bubble_attack", 	"weight": 0.8, "min_cooldown": 5.0, "tags": []}
 	]
 	
 	# 初始化 last_action_execution_times，確保所有動作在遊戲開始時都可以立即執行（如果條件允許）
@@ -579,210 +754,148 @@ func _gfb_initialize_available_actions() -> void:
 	for action_config in available_actions:
 		var action_name = action_config.get("name")
 		if action_name: # 確保 action_name 存在
-			last_action_execution_times[action_name] = current_time - action_config.get("min_interval", 100.0) - 1.0 # 減去一個較大的間隔以允許首次執行
+			last_action_execution_times[action_name] = current_time - action_config.get("min_cooldown", 100.0) - 1.0 # 減去一個較大的間隔以允許首次執行
 
 
-func _gfb_calculate_and_select_next_action() -> void: 
-	if not is_instance_valid(target_player):
-		_prepare_action_by_state(ACTION_IDLE)
+func _gfb_calculate_and_select_next_action() -> void:
+	if current_state != GiantFishState.IDLE and not is_counter_attack_pending:
 		return
 
-	var current_time = Time.get_ticks_msec() / 1000.0
-	var weighted_actions: Array[Dictionary] = []
-	var total_weight: float = 0.0
+	if is_in_combo:
+		# 如果正在執行連招，則不應由計時器觸發新的獨立動作決策
+		print_debug("[GiantFish AI] In combo, skipping normal action selection.")
+		return
 
-	print_debug("--- [AI Decision] Phase: %d, PlayerDist: %.2f, HP: %.2f%% ---" % [current_phase, global_position.distance_to(target_player.global_position) if target_player else -1.0, (current_health / initial_max_health) * 100.0 if initial_max_health > 0 else -1.0])
+	var player_context = _get_player_context()
+
+	# --- 策略性連招決策 ---
+	var potential_combos = []
+	for combo_name in combo_library.keys():
+		var combo_info = combo_library[combo_name]
+		if combo_info.get("condition", func(): return false).call():
+			potential_combos.append(combo_name)
+	
+	if not potential_combos.is_empty():
+		var selected_combo = potential_combos[randi() % potential_combos.size()]
+		# 檢查連招的第一個動作是否可用
+		var first_action_name = combo_library[selected_combo]["actions"][0]
+		var current_time = Time.get_ticks_msec() / 1000.0
+		var last_time = last_action_execution_times.get(first_action_name, 0.0)
+		var config = available_actions.filter(func(a): return a.name == first_action_name)[0]
+		
+		if current_time - last_time >= config.get("min_cooldown", 0.0):
+			print_debug("[GiantFish AI] Condition met for combo: %s. Starting." % selected_combo)
+			_start_combo(selected_combo)
+			return
+
+	# --- 單一行動決策邏輯 ---
+	var action_scores: Dictionary = {}
+	var total_score: float = 0.0
+	var debug_strings: Array[String] = []
+	var current_time = Time.get_ticks_msec() / 1000.0
 
 	for action_config in available_actions:
-		var action_name: String = action_config.get("name")
-		var base_weight: float = action_config.get("base_weight", 0.0)
-		var min_interval: float = action_config.get("min_interval", 0.0)
+		var action_name = action_config.get("name")
+		var score = float(action_config.get("weight", 0.0))
+		var reason = "Base:%.2f" % score
 
-		if action_name == ACTION_IDLE and consecutive_idle_count >= MAX_CONSECUTIVE_IDLE:
+		# 1. 硬性條件過濾 (冷卻)
+		var min_cooldown = action_config.get("min_cooldown", 0.0)
+		var time_since_last = current_time - last_action_execution_times.get(action_name, -999.0)
+		if time_since_last < min_cooldown:
 			continue
 
-		var _retrieved_phases_value = action_config.get("phases")
-		var allowed_phases: Array[int] = []
+		# 2. 動態權重調整
+		# A. 柔性冷卻 & 最近使用懲罰
+		if last_action_name == action_name:
+			score *= 0.25 # 大幅降低剛用過的招式的權重
+			reason += "*0.25(LastUsed)"
+		else:
+			# 剛脫離冷卻期的招式，權重較低，隨時間線性恢復
+			var time_over_cooldown = time_since_last - min_cooldown
+			var recovery_factor = clamp(time_over_cooldown / 5.0, 0.3, 1.0) # 5秒內恢復到100%權重
+			score *= recovery_factor
+			reason += "*%.2f(CooldownRecovery)" % recovery_factor
 
-		if _retrieved_phases_value != null and _retrieved_phases_value is Array:
-			for item in _retrieved_phases_value:
-				if item is int:
-					allowed_phases.append(item)
-				else:
-					printerr("Warning: Non-integer found in 'phases' array for action '", action_config.get("name"), "'. Item: ", item)
-
-		var conditions: Dictionary = action_config.get("conditions", {})
+		# B. 基於血量的攻擊性
+		var health_percent = current_health / initial_max_health
+		if health_percent < 0.5 and action_config.get("tags", []).has("aggressive"):
+			score *= 1.5 # 血量低於50%，攻擊性招式權重增加
+			reason += "*1.5(LowHealth)"
 		
-		var time_since_last_execution = current_time - last_action_execution_times.get(action_name, -INF)
+		# C. 根據玩家距離
+		if player_context.is_valid:
+			if player_context.is_close and action_config.get("tags", []).has("close_range"):
+				score *= 2.0; reason += "*2.0(PlayerClose)"
+			if player_context.is_far and action_config.get("tags", []).has("far_range"):
+				score *= 2.0; reason += "*2.0(PlayerFar)"
 		
-		if time_since_last_execution < min_interval:
-			continue
+		# D. 避免連續待機
+		if consecutive_idle_count >= 1 and action_config.get("is_utility", false):
+			score *= 0.1 # 如果上次是待機，大幅降低工具性招式（包括待機）的權重
+			reason += "*0.1(AvoidIdle)"
 
-		if not allowed_phases.has(current_phase):
-			continue
+		action_scores[action_name] = score
+		total_score += score
+		debug_strings.append("- '%s' score: %.2f (%s)" % [action_name, score, reason])
 
-		var conditions_met = true
-		var condition_adjustment_factor = 1.0
-
-		if conditions.has("min_player_dist"):
-			var dist_to_player = global_position.distance_to(target_player.global_position)
-			if dist_to_player < conditions.get("min_player_dist"):
-				conditions_met = false
-			elif dist_to_player < conditions.get("min_player_dist") * 1.5:
-				condition_adjustment_factor *= 1.2
-
-
-		if conditions.has("max_player_dist"):
-			var dist_to_player = global_position.distance_to(target_player.global_position)
-			if dist_to_player > conditions.get("max_player_dist"):
-				conditions_met = false
-			elif dist_to_player > conditions.get("max_player_dist") * 0.8:
-				condition_adjustment_factor *= 1.2
-
-
-		if conditions.has("boss_health_percent_below"):
-			if (current_health / initial_max_health) * 100.0 >= conditions.get("boss_health_percent_below"):
-				conditions_met = false
-		
-		if conditions.has("boss_health_percent_above"):
-			if (current_health / initial_max_health) * 100.0 <= conditions.get("boss_health_percent_above"):
-				conditions_met = false
-		
-		if conditions_met:
-			var current_action_weight = base_weight * condition_adjustment_factor * current_aggression_factor
-			weighted_actions.append({"name": action_name, "weight": current_action_weight})
-			total_weight += current_action_weight
-
-
-	if weighted_actions.is_empty():
-		var fallback_actions = [ACTION_JUMP_ATTACK, ACTION_TAIL_SWIPE_ATTACK]
-		var selected_fallback = fallback_actions[randi() % fallback_actions.size()]
-		print_debug("[AI Decision] No actions qualified. Forcing fallback action: '%s'" % selected_fallback)
-		_prepare_action_by_state(selected_fallback)
+	# ... (與之前類似的選擇邏輯)
+	if total_score <= 0:
+		_prepare_action_by_state(ACTION_IDLE) # 如果沒招可用，就待機
 		return
 
-	var random_roll = randf() * total_weight
-	var cumulative_weight = 0.0
-	var selected_action_name = ACTION_IDLE
+	var random_value = randf() * total_score
+	var cumulative_score: float = 0.0
+	var selected_action: String = ""
 
-	var qualified_actions_log = ""
-	for wa in weighted_actions:
-		qualified_actions_log += "  - %s (W: %.2f)" % [wa.get("name"), wa.get("weight")]
-	print_debug("[AI Decision] Qualified Actions:\n%s" % qualified_actions_log)
-
-
-	for action_data in weighted_actions:
-		cumulative_weight += action_data.get("weight", 0.0)
-		if random_roll <= cumulative_weight:
-			selected_action_name = action_data.get("name")
+	for action_name in action_scores.keys():
+		cumulative_score += action_scores[action_name]
+		if random_value <= cumulative_score:
+			selected_action = action_name
 			break
 	
-	print_debug("[AI Decision] Selected Action: '%s' (Roll: %.2f / TotalW: %.2f)" % [selected_action_name, random_roll, total_weight])
-	_prepare_action_by_state(selected_action_name)
+	if selected_action.is_empty(): selected_action = action_scores.keys()[0]
 
+	print("\n[GiantFish AI] --- Action Decision ---")
+	print("Player Context: " + str(player_context))
+	for s in debug_strings: print(s)
+	print("=> Selected Action: %s" % selected_action)
 
-func _prepare_action_by_state(action_name: String) -> void:
-	if action_name == ACTION_IDLE:
+	if selected_action == ACTION_IDLE:
 		consecutive_idle_count += 1
 	else:
 		consecutive_idle_count = 0
 
-	var action_config = null
-	for config_loop_var in available_actions:
-		if config_loop_var.get("name") == action_name:
-			action_config = config_loop_var
-			break
+	last_action_name = selected_action # 記錄本次執行的動作
+	_prepare_action_by_state(selected_action)
 
-	if not action_config:
-		printerr("[GFB _prepare_action_by_state] Error: Action config not found for '", action_name, "'. Defaulting to IDLE.")
-		action_name = ACTION_IDLE
-		for config_fallback_loop_var in available_actions:
-			if config_fallback_loop_var.get("name") == ACTION_IDLE:
-				action_config = config_fallback_loop_var
-				break
-	
-	if not action_config:
-		printerr("[GFB _prepare_action_by_state] CRITICAL Error: IDLE action config also not found! Cannot prepare any action.")
-		_change_state(GiantFishState.IDLE)
-		if attack_cooldown_timer and attack_cooldown_timer.is_stopped(): 
-			attack_cooldown_timer.start()
-		return
 
-	var function_to_call_name = action_config.get("function_name")
-
-	if function_to_call_name == null or not self.has_method(function_to_call_name):
-		printerr("[GFB _prepare_action_by_state] Error: Method '", str(function_to_call_name), "' not found for action '", action_name, "' or function_name is null. Defaulting to IDLE state.")
-		_change_state(GiantFishState.IDLE)
-		if attack_cooldown_timer and attack_cooldown_timer.is_stopped(): 
-			attack_cooldown_timer.start()
-		return
-
-	call(function_to_call_name)
-	
+func _prepare_action_by_state(action_name: String) -> void:
 	last_action_execution_times[action_name] = Time.get_ticks_msec() / 1000.0
+	match action_name:
+		ACTION_IDLE:
+			_prepare_idle()
+		ACTION_REPOSITION:
+			_prepare_reposition()
+		ACTION_SIDE_MOVE_ATTACK:
+			_prepare_half_body_move()
+		ACTION_JUMP_ATTACK:
+			_prepare_jump_attack()
+		ACTION_TAIL_SWIPE_ATTACK:
+			_prepare_tail_swipe_attack()
+		ACTION_BUBBLE_ATTACK:
+			_prepare_bubble_attack()
+		_:
+			printerr("[GFB _prepare_action] Error: Unknown action '%s'" % action_name)
+			_change_state(GiantFishState.IDLE)
 
-#endregion
-
-#region 打斷與反擊
-func _on_interrupted(_attack_name: String) -> void:
-	is_counter_attack_pending = true
-	print_debug("[Interrupt] Action '%s' was interrupted. Counter-attack is pending." % _attack_name)
-
-func _execute_counter_attack() -> void:
-	if not is_counter_attack_pending:
-		return
-	
-	is_counter_attack_pending = false
-
-	var counter_actions = []
-	for action in available_actions:
-		if action.get("is_counter_attack", false):
-			counter_actions.append(action.name)
-	
-	if counter_actions.is_empty():
-		printerr("[GFB] _execute_counter_attack was called, but no actions are flagged as counter-attacks!")
-		_change_state(GiantFishState.IDLE)
-		return
-
-	var selected_counter = counter_actions[randi() % counter_actions.size()]
-	
-	print_debug("[Interrupt] Executing counter-attack with action: '%s'" % selected_counter)
-
-	last_action_execution_times[selected_counter] = 0
-	
-	call_deferred("_prepare_action_by_state", selected_counter)
-
-#endregion
-
-#region 動畫、信號回調與父類函式覆寫
-
-# 動畫播放完畢時的回調
-func _on_animation_finished() -> void:
-	if current_state == BossBase.BossState.HURT and is_counter_attack_pending:
-		_execute_counter_attack()
-		return
-
-	super._on_animation_finished()
-
-func _is_state_duration_handled_manually(state: int) -> bool:
-	return state in [
-		GiantFishState.SIDE_MOVE_ATTACK_STATE,
-		GiantFishState.DIVE,
-		GiantFishState.SUBMERGED_MOVE,
-		GiantFishState.EMERGE_JUMP,
-		GiantFishState.TAIL_SWIPE,
-		GiantFishState.BUBBLE_ATTACK_STATE,
-		GiantFishState.PHASE_TRANSITION # 階段轉換本身也應手動控制
-	]
 
 func _is_state_an_attack(state: int) -> bool:
 	return state in [
-		GiantFishState.SIDE_MOVE_ATTACK_STATE,
-		GiantFishState.DIVE,
-		GiantFishState.SUBMERGED_MOVE,
 		GiantFishState.EMERGE_JUMP,
 		GiantFishState.TAIL_SWIPE,
-		GiantFishState.BUBBLE_ATTACK_STATE
+		GiantFishState.BUBBLE_ATTACK_STATE,
+		GiantFishState.REPOSITION_STATE
 	] or super._is_state_an_attack(state)
 
 func get_current_animation_name() -> String:
@@ -799,6 +912,11 @@ func get_current_animation_name() -> String:
 			return "dive_move"
 		GiantFishState.EMERGE_JUMP:
 			return "emerge_jump"
+		GiantFishState.PHASE_TRANSITION:
+			# 修正為正確的動畫名稱
+			return "phase_transition"
+		GiantFishState.REPOSITION_STATE:
+			return "move" 
 		_:
 			return super.get_current_animation_name()
 #endregion

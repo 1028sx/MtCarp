@@ -1229,7 +1229,7 @@ shape = SubResource("CapsuleShape2D_pwo0r")
 position = Vector2(-1, -27)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_pdjgy")
-animation = &"attack3"
+animation = &"new_animation"
 
 [node name="GroundSlamArea" type="Area2D" parent="."]
 collision_layer = 32

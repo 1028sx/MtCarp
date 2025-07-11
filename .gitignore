@@ -1,55 +1,15 @@
-# Godot 4+ specific ignores
+# Godot 4+ cache and imported files
 .godot/
-!.godot/icon.svg
-!.godot/project.godot
+*.translation
 
-# Mono-specific ignores (if applicable, uncomment)
-# .mono/
-# data_*/
-# dlls/
-# modules/mono/glue/
-
-# General ignores
-*.o
-*.lo
-*.la
-*.al
-*.libs
-*.so
-*.so.*
-*.a
-*.dll
-*.pyc
-*.pyo
-*.pyd
-*.swp
-*~
-.#*
-*.DS_Store
-*.TMP
-*.tmp
-
-# Exported binaries and packs
-*.exe
-*.pck
-*.zip
-*.tar.gz
-*.dmg
-*.app/
-export_presets.cfg
-
-# User-specific settings (optional)
-# project.godot.user
-# project.binary.user
-
-# Asset Store content (optional, if you want to re-download)
-# addons/
-
-# 原始README檔案（包含敏感資訊）
+# Internal development files
+/knowledge_base/
+開發任務清單.md
 ORIGINAL_README.md
 
-# 忽略 godot-mcp 工具目錄
+# Tooling and backup directories
 godot-mcp/
-
-# 忽略備份資料夾
 /backups/
+
+# Editor-specific settings
+.vscode/

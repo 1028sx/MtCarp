@@ -4,7 +4,7 @@ extends Node2D
 	"archer": preload("res://scenes/enemies/archer.tscn"),
 	"boar": preload("res://scenes/enemies/boar.tscn"),  # Boss
 	"bird": preload("res://scenes/enemies/small_bird.tscn"),
-	"deer": preload("res://scenes/enemies/deer.tscn"),  # Boss
+	"deer": preload("res://scenes/bosses/deer/deer.tscn"),  # Boss
 	"chicken": preload("res://scenes/enemies/chicken.tscn")
 }
 
@@ -230,14 +230,18 @@ func _spawn_enemy(spawn_point: Node2D, enemy_type: String = "") -> void:
 		if enemy:
 			enemy_container.add_child(enemy)
 			enemy.global_position = spawn_position
-			
-			if not enemy.defeated.is_connected(_on_enemy_defeated):
-				enemy.defeated.connect(_on_enemy_defeated.bind(enemy))
-			current_enemies.append(enemy)
+
+			# 新增：在連接信號前，先檢查敵人是否確實為 EnemyAIBase 類型
+			if enemy is EnemyAIBase:
+				if not enemy.defeated.is_connected(_on_enemy_defeated):
+					enemy.defeated.connect(_on_enemy_defeated.bind(enemy))
+				current_enemies.append(enemy)
+			else:
+				push_warning("[%s] 警告：生成的敵人 '%s' 沒有附加 EnemyAIBase 腳本，無法管理。" % [name, enemy.name])
 		else:
-			push_error("[EnemyManager] 錯誤：敵人實例化失敗")
+			push_error("[%s] 錯誤：敵人實例化失敗" % name)
 	else:
-		push_error("[EnemyManager] 錯誤：無法加載敵人場景")
+		push_error("[%s] 錯誤：無法加載敵人場景" % name)
 
 func clear_current_enemies() -> void:
 	for enemy in current_enemies:

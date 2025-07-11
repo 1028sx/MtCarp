@@ -1,6 +1,6 @@
 [gd_scene load_steps=43 format=3 uid="uid://iavbbnd70b78"]
 
-[ext_resource type="Script" path="res://scripts/enemies/archer.gd" id="1_w88m3"]
+[ext_resource type="Script" path="res://scripts/enemies/archer/archer.gd" id="1_w88m3"]
 [ext_resource type="Texture2D" uid="uid://bgmynisrtv6pw" path="res://assets/enemies/archer/GandalfHardcore Archer sheet.png" id="2_7wahy"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_rlneg"]
@@ -283,39 +283,34 @@ height = 88.0
 [sub_resource type="CircleShape2D" id="CircleShape2D_pqsfr"]
 radius = 700.0
 
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_kpofg"]
-radius = 34.0
-height = 88.0
-
 [sub_resource type="CircleShape2D" id="CircleShape2D_gokls"]
-radius = 206.073
+radius = 537.015
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_s87c1"]
+radius = 148.788
 
 [node name="Archer" type="CharacterBody2D" groups=["enemy"]]
 collision_layer = 4
-collision_mask = 3
 script = ExtResource("1_w88m3")
+health = 300.0
+hitbox_area = NodePath("Hitbox")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+position = Vector2(13, -20)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_0wona")
 animation = &"run"
-frame_progress = 0.708702
+
+[node name="ArrowSpawnPoint" type="Marker2D" parent="AnimatedSprite2D"]
+position = Vector2(7, 10)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-16, 18)
+visible = false
 shape = SubResource("CapsuleShape2D_3khgf")
 
-[node name="DetectionArea" type="Area2D" parent="."]
-visible = false
-collision_layer = 0
+[node name="TouchDamageArea" type="Area2D" parent="."]
+collision_layer = 128
 collision_mask = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea"]
-shape = SubResource("CircleShape2D_pqsfr")
-
-[node name="AttackTimer" type="Timer" parent="."]
-wait_time = 1.5
-one_shot = true
 
 [node name="Hitbox" type="Area2D" parent="."]
 light_mask = 0
@@ -323,26 +318,44 @@ visibility_layer = 0
 collision_layer = 16
 collision_mask = 32
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
-position = Vector2(-16, 18)
-shape = SubResource("CapsuleShape2D_kpofg")
+[node name="DetectionArea" type="Area2D" parent="."]
+visible = false
+collision_layer = 128
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectionArea"]
+shape = SubResource("CircleShape2D_pqsfr")
 
 [node name="AttackArea" type="Area2D" parent="." groups=["enemy"]]
 visible = false
-collision_layer = 0
+collision_layer = 128
 collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea"]
-scale = Vector2(2, 2)
 shape = SubResource("CircleShape2D_gokls")
 
-[node name="EdgeCheck" type="RayCast2D" parent="."]
-target_position = Vector2(33, 0)
+[node name="RetreatRangeArea" type="Area2D" parent="." groups=["enemy"]]
+visible = false
+collision_layer = 128
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RetreatRangeArea"]
+shape = SubResource("CircleShape2D_s87c1")
+
+[node name="AttackCooldownTimer" type="Timer" parent="."]
+wait_time = 1.5
+one_shot = true
+
+[node name="EdgeCheckRight" type="RayCast2D" parent="."]
+position = Vector2(-25, 35)
+target_position = Vector2(0, 10)
+
+[node name="EdgeCheckLeft" type="RayCast2D" parent="."]
+position = Vector2(25, 35)
+target_position = Vector2(0, 10)
 
 [node name="HealthBar" type="ProgressBar" parent="."]
-offset_left = -33.0
-offset_top = -57.0
-offset_right = 17.0
-offset_bottom = -30.0
-
-[connection signal="area_entered" from="Hitbox" to="." method="_on_hitbox_area_entered"]
+offset_left = -24.0
+offset_top = -71.0
+offset_right = 26.0
+offset_bottom = -44.0

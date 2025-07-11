@@ -1,4 +1,4 @@
-class_name State_Attack
+class_name state_attack
 extends PlayerState
 
 @export var idle_state: PlayerState
@@ -178,7 +178,7 @@ func _apply_attack_damage() -> void:
 			if body.is_in_group("boss"):
 				body.take_damage(damage, player)
 			else:
-				body.take_damage(damage)
+				body.take_damage(damage, player)
 			
 			if player.active_effects.has("life_steal"):
 				player.current_health = min(player.current_health + 2, player.max_health)

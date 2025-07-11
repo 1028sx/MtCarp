@@ -1,9 +1,11 @@
 [gd_scene load_steps=86 format=3 uid="uid://bp0821e8paeko"]
 
-[ext_resource type="Script" path="res://scripts/enemies/deer.gd" id="1_v6rw1"]
-[ext_resource type="Script" path="res://scripts/enemies/deer_effect_manager.gd" id="2_fawq0"]
+[ext_resource type="Script" path="res://scripts/bosses/deer/deer.gd" id="1_v6rw1"]
+[ext_resource type="Script" path="res://scripts/bosses/deer/deer_effect_manager.gd" id="2_fawq0"]
 [ext_resource type="Texture2D" uid="uid://q53kg5lefpq7" path="res://assets/enemies/Deer/0_MiniDeer [Original]/0_MiniDeer [Original].png" id="2_vmpb2"]
 [ext_resource type="Texture2D" uid="uid://dsqr2sv54i17u" path="res://assets/enemies/Pixel Holy Spell Effect 32x32 Pack 3/01.png" id="3_rvt6e"]
+[ext_resource type="PackedScene" uid="uid://cmr4vogiuxnjt" path="res://scenes/bosses/deer/deer_bullet.tscn" id="4_5wxgw"]
+[ext_resource type="PackedScene" uid="uid://b75qyc7k7ff8m" path="res://scenes/bosses/deer/deer_spirit.tscn" id="5_a6p0q"]
 [ext_resource type="Texture2D" uid="uid://1se24jsn6d5f" path="res://assets/enemies/Effect Pack #8/Shield Idle.png" id="5_7irjn"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_136ek"]
@@ -643,9 +645,9 @@ position = Vector2(3, 13)
 sprite_frames = SubResource("SpriteFrames_8omvg")
 frame = 9
 frame_progress = 1.0
-
 [node name="ShieldEffect" type="AnimatedSprite2D" parent="EffectManager"]
 position = Vector2(-0.499999, 8.5)
 scale = Vector2(0.525862, 0.525862)
 sprite_frames = SubResource("SpriteFrames_1qxvl")
 frame_progress = 0.417305
+
