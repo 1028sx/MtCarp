@@ -121,6 +121,7 @@ ground_slam={
 2d_render/layer_5="EnemyHitbox"
 2d_render/layer_6="PlayerAttack"
 2d_render/layer_7="EnemyAttack"
+2d_render/layer_8="EnemySensor"
 
 [rendering]
 

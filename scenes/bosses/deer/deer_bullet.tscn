@@ -1,6 +1,6 @@
 [gd_scene load_steps=19 format=3 uid="uid://cmr4vogiuxnjt"]
 
-[ext_resource type="Script" path="res://scripts/enemies/deer_bullet.gd" id="1_8was7"]
+[ext_resource type="Script" path="res://scripts/bosses/deer/deer_bullet.gd" id="1_8was7"]
 [ext_resource type="Texture2D" uid="uid://wt6sjdwevesl" path="res://assets/enemies/Effect and FX Pixel Part 12 Free/579.png" id="2_bw72k"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_tu3hu"]

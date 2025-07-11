@@ -1,6 +1,6 @@
 [gd_scene load_steps=144 format=3 uid="uid://mfexmepg65h2"]
 
-[ext_resource type="Script" path="res://scripts/enemies/small_bird.gd" id="1_iv3na"]
+[ext_resource type="Script" path="res://scripts/enemies/small_bird/small_bird.gd" id="1_iv3na"]
 [ext_resource type="Texture2D" uid="uid://qhss2hntj8cr" path="res://assets/enemies/falconpack_spritesheets/falcon_attack_air_strip6.png" id="2_p4a6g"]
 [ext_resource type="Texture2D" uid="uid://vbiy3hytgh38" path="res://assets/enemies/falconpack_spritesheets/falcon_attack_ground_strip6.png" id="3_qgbdw"]
 [ext_resource type="Texture2D" uid="uid://caw8v42euph3l" path="res://assets/enemies/falconpack_spritesheets/falcon_dash_strip8.png" id="4_dsmjg"]
@@ -948,9 +948,13 @@ animations = [{
 "speed": 10.0
 }]
 
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_46xi6"]
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_1byv7"]
 radius = 14.0
-height = 44.0
+height = 52.0
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_a3lxv"]
+radius = 15.0
+height = 58.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_htx4c"]
 radius = 392.216
@@ -958,42 +962,47 @@ radius = 392.216
 [sub_resource type="CircleShape2D" id="CircleShape2D_vqsbp"]
 radius = 8.0
 
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_o2ywt"]
-radius = 15.0
-height = 58.0
-
-[node name="SmallBird" type="CharacterBody2D"]
+[node name="SmallBird" type="CharacterBody2D" groups=["enemy"]]
+collision_layer = 4
 script = ExtResource("1_iv3na")
+hitbox_area = NodePath("Hitbox")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_ncj60")
-animation = &"die"
+animation = &"hurt"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(2, 0)
-shape = SubResource("CapsuleShape2D_46xi6")
+[node name="StandingCollisionShape" type="CollisionShape2D" parent="."]
+shape = SubResource("CapsuleShape2D_1byv7")
+
+[node name="FlyingCollisionShape" type="CollisionShape2D" parent="."]
+position = Vector2(0, -10)
+rotation = 1.5708
+shape = SubResource("CapsuleShape2D_a3lxv")
+
+[node name="Hitbox" type="Area2D" parent="."]
+collision_layer = 16
+collision_mask = 32
 
 [node name="DetectionArea" type="Area2D" parent="."]
+visible = false
+collision_layer = 0
+collision_mask = 2
 
 [node name="CircleShape2D" type="CollisionShape2D" parent="DetectionArea"]
 shape = SubResource("CircleShape2D_htx4c")
 
 [node name="AttackArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea"]
 position = Vector2(20, -8)
 shape = SubResource("CircleShape2D_vqsbp")
 
-[node name="Hitbox" type="Area2D" parent="."]
+[node name="RetreatRangeArea" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
-position = Vector2(-1, -8)
-rotation = 1.5708
-shape = SubResource("CapsuleShape2D_o2ywt")
-
-[node name="AttackTimer" type="Timer" parent="."]
-
-[node name="VisibleOnScreenNotifier2D" type="VisibleOnScreenNotifier2D" parent="."]
-position = Vector2(6, -14.5)
-scale = Vector2(5.2, 2.45)
+[node name="AttackCooldownTimer" type="Timer" parent="."]
+one_shot = true

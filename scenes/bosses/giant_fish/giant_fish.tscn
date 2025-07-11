@@ -1,9 +1,9 @@
 [gd_scene load_steps=137 format=3 uid="uid://dbt8ov2umye2h"]
 
-[ext_resource type="Script" path="res://scripts/enemies/boss/giant_fish.gd" id="1_je4ny"]
+[ext_resource type="Script" path="res://scripts/bosses/giant_fish/giant_fish.gd" id="1_je4ny"]
 [ext_resource type="Texture2D" uid="uid://d4mrq1dtmby8f" path="res://assets/enemies/fish/appear.png" id="2_5p2tk"]
 [ext_resource type="Texture2D" uid="uid://q53kg5lefpq7" path="res://assets/enemies/Deer/0_MiniDeer [Original]/0_MiniDeer [Original].png" id="2_141aw"]
-[ext_resource type="Script" path="res://scripts/enemies/deer_effect_manager.gd" id="3_78yf2"]
+[ext_resource type="Script" path="res://scripts/bosses/deer/deer_effect_manager.gd" id="3_78yf2"]
 [ext_resource type="Texture2D" uid="uid://dtk1lkac0mvqc" path="res://assets/enemies/fish/bubble_attack.png" id="3_wqk05"]
 [ext_resource type="Texture2D" uid="uid://dsqr2sv54i17u" path="res://assets/enemies/Pixel Holy Spell Effect 32x32 Pack 3/01.png" id="4_0lao5"]
 [ext_resource type="Texture2D" uid="uid://1se24jsn6d5f" path="res://assets/enemies/Effect Pack #8/Shield Idle.png" id="5_303gb"]
@@ -933,8 +933,7 @@ texture_filter = 1
 position = Vector2(0, 1)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_ncj60")
-animation = &"idle1"
-frame_progress = 0.191821
+animation = &"appear"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(2, 14)

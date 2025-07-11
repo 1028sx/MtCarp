@@ -1,6 +1,6 @@
 [gd_scene load_steps=11 format=3 uid="uid://docm2db81k064"]
 
-[ext_resource type="Script" path="res://scripts/ui/ui.gd" id="1_v1yvl"]
+[ext_resource type="Script" path="res://scripts/ui/ui.gd" id="1_ntpic"]
 [ext_resource type="Texture2D" uid="uid://cqgq3cy7leaw8" path="res://assets/UI/HealthBarPanel_160x41.png" id="2_765ai"]
 [ext_resource type="Texture2D" uid="uid://bh6n1emb848gr" path="res://assets/UI/ValueRed_120x8.png" id="3_dabok"]
 [ext_resource type="Texture2D" uid="uid://csmhcjosvmwi3" path="res://assets/UI/ValueBlue_120x8.png" id="4_0m00s"]
@@ -12,7 +12,7 @@
 [ext_resource type="PackedScene" uid="uid://bmxb481600v1h" path="res://scenes/ui/game_over_screen.tscn" id="15_pbyqr"]
 
 [node name="CanvasLayer(UI)" type="CanvasLayer" groups=["ui"]]
-script = ExtResource("1_v1yvl")
+script = ExtResource("1_ntpic")
 
 [node name="Control_HUD" type="Control" parent="."]
 layout_mode = 3
