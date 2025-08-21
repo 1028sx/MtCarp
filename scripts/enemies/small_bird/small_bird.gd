@@ -1,49 +1,56 @@
-extends "res://scripts/enemies/base/enemy_ai_base.gd"
-
-#region 狀態腳本預載入
-const SmallBirdPatrolState = preload("res://scripts/enemies/small_bird/states/SmallBirdPatrolState.gd")
-const SmallBirdChaseState = preload("res://scripts/enemies/small_bird/states/SmallBirdChaseState.gd")
-const SmallBirdAttackState = preload("res://scripts/enemies/small_bird/states/SmallBirdAttackState.gd")
-const SmallBirdHurtState = preload("res://scripts/enemies/small_bird/states/SmallBirdHurtState.gd")
-const DeadState = preload("res://scripts/enemies/base/states/common/DeadState.gd")
-#endregion
-
+extends "res://scripts/enemies/base/flying_enemy_base.gd"
 
 #region 導出屬性 (覆寫或新增)
-@export_group("飛行行為")
-@export var patrol_area_radius: float = 300.0
-@export var patrol_speed: float = 100.0
-@export var chase_speed: float = 250.0
-@export var dive_speed: float = 400.0
-@export var climb_speed: float = 200.0
-@export var ideal_attack_height: float = 150.0
-
 @export_group("攻擊行為")
 @export var dive_attack_damage: int = 15
 #endregion
 
-
 #region 節點與變數
-var patrol_center: Vector2
 @onready var standing_collision_shape: CollisionShape2D = $StandingCollisionShape
 @onready var flying_collision_shape: CollisionShape2D = $FlyingCollisionShape
+@onready var attack_area_right: Area2D = $AttackAreaRight
+@onready var attack_area_left: Area2D = $AttackAreaLeft
+
+# 獲取當前活動的攻擊區域
+func get_current_attack_area() -> Area2D:
+	# 根據精靈的翻轉狀態選擇正確的攻擊區域
+	if animated_sprite and animated_sprite.flip_h:
+		return attack_area_left
+	else:
+		return attack_area_right
 #endregion
 
 
 func _ready() -> void:
 	super._ready()
 	
-	patrol_center = global_position
-	
-	gravity_scale = 0
-	
 	_initialize_states()
 	
 	if is_instance_valid(animated_sprite):
 		animated_sprite.animation_changed.connect(set_collision_shape_state)
+		animated_sprite.frame_changed.connect(_on_animation_frame_changed)
 		set_collision_shape_state()
 	else:
 		push_warning("SmallBird: 找不到 AnimatedSprite2D 節點！形狀切換將無法運作。")
+	
+	# 連接攻擊區域信號
+	if attack_area_right:
+		attack_area_right.area_entered.connect(_on_attack_area_area_entered)
+		attack_area_right.body_entered.connect(_on_attack_area_body_entered)
+		# 初始時禁用攻擊區域監測
+		attack_area_right.monitoring = false
+	
+	if attack_area_left:
+		attack_area_left.area_entered.connect(_on_attack_area_area_entered)
+		attack_area_left.body_entered.connect(_on_attack_area_body_entered)
+		# 初始時禁用攻擊區域監測
+		attack_area_left.monitoring = false
+	
+	# 重新指向SmallBird特定的攻擊冷卻計時器節點
+	attack_cooldown_timer = $AttackCooldownTimer
+	if attack_cooldown_timer:
+		attack_cooldown_timer.wait_time = 2.0  # 2秒攻擊冷卻
+		attack_cooldown_timer.one_shot = true
 	
 	change_state("Patrol")
 
@@ -74,7 +81,7 @@ func _initialize_states() -> void:
 	add_state("Chase", SmallBirdChaseState.new())
 	add_state("Attack", SmallBirdAttackState.new())
 	add_state("Hurt", SmallBirdHurtState.new())
-	add_state("Dead", DeadState.new())
+	add_state("Dead", EnemyDeadState.new()) # DeadState 是通用的，已經有 class_name
 
 
 #region 動畫名稱覆寫
@@ -91,17 +98,14 @@ func _get_land_animation() -> String: return "land"
 #endregion
 
 # region 狀態切換邏輯
-# 基於 EnemyAIBase 的信號回調，實現小鳥的狀態切換邏輯
 
 func _on_detection_area_body_entered(body: Node) -> void:
-	super._on_detection_area_body_entered(body) # 呼叫父類方法以設定 self.player
-	# 只有在可以被中斷的狀態下，偵測到玩家才會切換到追擊狀態
+	super._on_detection_area_body_entered(body)
 	if current_state_name in ["Patrol", "Idle"]:
 		change_state("Chase")
 
 func _on_detection_area_body_exited(body: Node) -> void:
-	super._on_detection_area_body_exited(body) # 呼叫父類方法以清除 self.player
-	# 只有在追擊狀態下，丟失玩家才會切換回巡邏狀態
+	super._on_detection_area_body_exited(body)
 	if current_state_name == "Chase":
 		change_state("Patrol")
 
@@ -118,3 +122,25 @@ func take_damage(amount: float, _attacker: Node) -> void:
 		change_state("Dead")
 	else:
 		change_state("Hurt")
+
+
+#region 攻擊區域信號處理
+func _on_attack_area_area_entered(area: Area2D) -> void:
+	# 將事件轉發給當前狀態
+	if current_state and current_state.has_method("on_attack_area_entered"):
+		current_state.on_attack_area_entered(area)
+
+func _on_attack_area_body_entered(body: Node) -> void:
+	if body.name == "Player":
+		if body.has_method("take_damage"):
+			body.take_damage(dive_attack_damage, self)
+	
+	# 將事件轉發給當前狀態
+	if current_state and current_state.has_method("on_attack_area_body_entered"):
+		current_state.on_attack_area_body_entered(body)
+
+func _on_animation_frame_changed() -> void:
+	# 將動畫幀變化事件轉發給當前狀態
+	if current_state and current_state.has_method("on_animation_frame_changed"):
+		current_state.on_animation_frame_changed(animated_sprite.frame)
+#endregion

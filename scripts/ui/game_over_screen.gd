@@ -25,15 +25,8 @@ func _ready() -> void:
 	github_button.pressed.connect(_on_github_pressed)
 	feedback_button.pressed.connect(_on_feedback_pressed)
 
-	print("[GameOverScreen _ready] Checking node references:")
-	print("  play_time_label is null: ", play_time_label == null)
-	print("  kill_count_label is null: ", kill_count_label == null)
-	print("  max_combo_label is null: ", max_combo_label == null)
-	print("  gold_label is null: ", gold_label == null)
-	print("  links_label is null: ", links_label == null)
 
 func show_screen() -> void:
-	print("[GameOverScreen] show_screen() CALLED. Visible: ", visible, " Time: ", Time.get_ticks_msec())
 	# 顯示統計數據
 	call_deferred("_update_stats")
 	# 顯示畫面
@@ -50,19 +43,14 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_stats() -> void:
-	print("[GameOverScreen] _update_stats() CALLED. Time: ", Time.get_ticks_msec())
 	# Add null checks before accessing properties
 	if play_time_label == null:
-		printerr("[GameOverScreen _update_stats] Error: play_time_label is null!")
 		return
 	if kill_count_label == null:
-		printerr("[GameOverScreen _update_stats] Error: kill_count_label is null!")
 		return
 	if max_combo_label == null:
-		printerr("[GameOverScreen _update_stats] Error: max_combo_label is null!")
 		return
 	if gold_label == null:
-		printerr("[GameOverScreen _update_stats] Error: gold_label is null!")
 		return
 	# links_label is used in other functions, check there if issues arise.
 

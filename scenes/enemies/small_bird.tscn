@@ -960,7 +960,7 @@ height = 58.0
 radius = 392.216
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_vqsbp"]
-radius = 8.0
+radius = 9.0
 
 [node name="SmallBird" type="CharacterBody2D" groups=["enemy"]]
 collision_layer = 4
@@ -986,21 +986,29 @@ collision_mask = 32
 
 [node name="DetectionArea" type="Area2D" parent="."]
 visible = false
-collision_layer = 0
+collision_layer = 128
 collision_mask = 2
 
 [node name="CircleShape2D" type="CollisionShape2D" parent="DetectionArea"]
 shape = SubResource("CircleShape2D_htx4c")
 
-[node name="AttackArea" type="Area2D" parent="."]
-collision_layer = 0
+[node name="AttackAreaRight" type="Area2D" parent="."]
+collision_layer = 128
 collision_mask = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackAreaRight"]
 position = Vector2(20, -8)
 shape = SubResource("CircleShape2D_vqsbp")
 
-[node name="RetreatRangeArea" type="Area2D" parent="."]
+[node name="AttackAreaLeft" type="Area2D" parent="."]
+collision_layer = 128
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackAreaLeft"]
+position = Vector2(-20, -8)
+shape = SubResource("CircleShape2D_vqsbp")
+
+[node name="TouchDamageArea" type="Area2D" parent="."]
 collision_layer = 0
 collision_mask = 2
 

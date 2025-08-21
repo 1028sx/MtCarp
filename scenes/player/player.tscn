@@ -1,4 +1,4 @@
-[gd_scene load_steps=200 format=3 uid="uid://b2q5462bdb0q2"]
+[gd_scene load_steps=194 format=3 uid="uid://b2q5462bdb0q2"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_b51by"]
 [ext_resource type="Texture2D" uid="uid://cyr1632llp4qs" path="res://assets/players/Sprites/DASH.png" id="2_egfxe"]
@@ -13,33 +13,28 @@
 [ext_resource type="Texture2D" uid="uid://c3ovpu7fprajr" path="res://assets/players/Sprites/Run3.png" id="11_snl0w"]
 [ext_resource type="Texture2D" uid="uid://b3b2kd5o8dhvt" path="res://assets/players/Sprites/RUN.png" id="11_srnqu"]
 [ext_resource type="Texture2D" uid="uid://br7gfphpal5b6" path="res://assets/players/Sprites/SPECIAL ATTACK.png" id="12_1pdjf"]
-[ext_resource type="Texture2D" uid="uid://d337s6hmcv80r" path="res://assets/players/new/sprites/IMG_2090.png" id="12_ct6uc"]
 [ext_resource type="Texture2D" uid="uid://h7ym4ad3ukqh" path="res://assets/players/Sprites/THROW.png" id="13_5hd7f"]
-[ext_resource type="Texture2D" uid="uid://dl0ohb67vrm7l" path="res://assets/players/new/sprites/IMG_2091.png" id="13_h0jfp"]
-[ext_resource type="Script" path="res://scripts/player/effect_manager.gd" id="14_0086w"]
-[ext_resource type="Texture2D" uid="uid://vcfx1nqmgway" path="res://assets/players/new/sprites/IMG_2092.png" id="14_d6m86"]
+[ext_resource type="Script" path="res://scripts/player/player_effect_manager.gd" id="14_0086w"]
 [ext_resource type="Texture2D" uid="uid://lmoy8tk3u1tr" path="res://assets/players/effects/Free Smoke Fx  Pixel 05.png" id="14_ilypw"]
-[ext_resource type="Texture2D" uid="uid://dxdu6dj4r42y3" path="res://assets/players/new/sprites/IMG_2093.png" id="15_qkkh0"]
-[ext_resource type="Texture2D" uid="uid://ca7us17k8mum1" path="res://assets/players/new/sprites/IMG_2094.png" id="16_eieq5"]
+[ext_resource type="Texture2D" uid="uid://jw0pnhkj3j8l" path="res://assets/players/Sprites/WALL JUMP.png" id="15_djigc"]
 [ext_resource type="Texture2D" uid="uid://dfrbmj1dx4k2w" path="res://assets/players/effects/Free Smoke Fx  Pixel 04.png" id="16_kkuvf"]
+[ext_resource type="Texture2D" uid="uid://b55crxmr2e137" path="res://assets/players/Sprites/WALL SLIDE.png" id="16_wkske"]
 [ext_resource type="Texture2D" uid="uid://dsqr2sv54i17u" path="res://assets/enemies/Pixel Holy Spell Effect 32x32 Pack 3/01.png" id="17_7dyff"]
-[ext_resource type="Texture2D" uid="uid://bmd7t3g40o66q" path="res://assets/players/new/sprites/IMG_2095.png" id="17_7uhp3"]
-[ext_resource type="Texture2D" uid="uid://bmdjc6gdjcixr" path="res://assets/players/new/sprites/IMG_2096.png" id="18_nmo1w"]
 [ext_resource type="Texture2D" uid="uid://d1qo308tg8hxf" path="res://assets/enemies/Pixel Holy Spell Effect 32x32 Pack 3/00.png" id="18_uhvla"]
 [ext_resource type="Script" path="res://scripts/player/player_state_machine.gd" id="19_gtvji"]
-[ext_resource type="Script" path="res://scripts/player/states/state_run.gd" id="20_r50md"]
-[ext_resource type="Script" path="res://scripts/player/states/state_idle.gd" id="21_2dhpi"]
-[ext_resource type="Script" path="res://scripts/player/states/state_fall.gd" id="22_0x2o7"]
+[ext_resource type="Script" path="res://scripts/player/states/player_run_state.gd" id="20_r50md"]
+[ext_resource type="Script" path="res://scripts/player/states/player_idle_state.gd" id="21_2dhpi"]
+[ext_resource type="Script" path="res://scripts/player/states/player_fall_state.gd" id="22_0x2o7"]
 [ext_resource type="Script" path="res://scripts/player/player_attack_area.gd" id="22_sh46p"]
-[ext_resource type="Script" path="res://scripts/player/states/state_jump.gd" id="23_4ug8u"]
-[ext_resource type="Script" path="res://scripts/player/states/state_dash.gd" id="24_8sbic"]
-[ext_resource type="Script" path="res://scripts/player/states/state_attack.gd" id="25_nesor"]
-[ext_resource type="Script" path="res://scripts/player/states/state_special_attack.gd" id="26_ye8o0"]
+[ext_resource type="Script" path="res://scripts/player/states/player_dash_state.gd" id="24_8sbic"]
+[ext_resource type="Script" path="res://scripts/player/states/player_attack_state.gd" id="25_nesor"]
+[ext_resource type="Script" path="res://scripts/player/states/player_special_attack_state.gd" id="26_ye8o0"]
 [ext_resource type="Script" path="res://addons/MetroidvaniaSystem/Scripts/MetroidvaniaSystem.gd" id="27_vq02x"]
-[ext_resource type="Script" path="res://scripts/player/states/state_hurt.gd" id="34_pa3c0"]
-[ext_resource type="Script" path="res://scripts/player/states/state_wall_slide.gd" id="35_h76fr"]
-[ext_resource type="Script" path="res://scripts/player/states/state_ground_slam.gd" id="36_bu6a7"]
-[ext_resource type="Script" path="res://scripts/player/states/state_dead.gd" id="37_d38xp"]
+[ext_resource type="Script" path="res://scripts/player/states/player_jump_state.gd" id="31_h11jm"]
+[ext_resource type="Script" path="res://scripts/player/states/player_hurt_state.gd" id="34_pa3c0"]
+[ext_resource type="Script" path="res://scripts/player/states/player_wall_slide_state.gd" id="35_h76fr"]
+[ext_resource type="Script" path="res://scripts/player/states/player_ground_slam_state.gd" id="36_bu6a7"]
+[ext_resource type="Script" path="res://scripts/player/states/player_dead_state.gd" id="37_d38xp"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pwo0r"]
 radius = 8.5
@@ -393,33 +388,29 @@ region = Rect2(465, 0, 93, 112)
 atlas = ExtResource("13_5hd7f")
 region = Rect2(558, 0, 93, 112)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_8wyqu"]
-atlas = ExtResource("12_ct6uc")
-region = Rect2(0, 0, 400, 400)
+[sub_resource type="AtlasTexture" id="AtlasTexture_8fjfe"]
+atlas = ExtResource("15_djigc")
+region = Rect2(0, 0, 96, 96)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_24cv4"]
-atlas = ExtResource("13_h0jfp")
-region = Rect2(0, 0, 400, 400)
+[sub_resource type="AtlasTexture" id="AtlasTexture_856ky"]
+atlas = ExtResource("15_djigc")
+region = Rect2(96, 0, 96, 96)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_7a3wl"]
-atlas = ExtResource("14_d6m86")
-region = Rect2(0, 0, 400, 400)
+[sub_resource type="AtlasTexture" id="AtlasTexture_4afd7"]
+atlas = ExtResource("15_djigc")
+region = Rect2(192, 0, 96, 96)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_2gm5t"]
-atlas = ExtResource("15_qkkh0")
-region = Rect2(0, 0, 400, 400)
+[sub_resource type="AtlasTexture" id="AtlasTexture_k8nyd"]
+atlas = ExtResource("16_wkske")
+region = Rect2(0, 0, 96, 96)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_tqm1m"]
-atlas = ExtResource("16_eieq5")
-region = Rect2(0, 0, 400, 400)
+[sub_resource type="AtlasTexture" id="AtlasTexture_4qmtk"]
+atlas = ExtResource("16_wkske")
+region = Rect2(96, 0, 96, 96)
 
-[sub_resource type="AtlasTexture" id="AtlasTexture_vg0ma"]
-atlas = ExtResource("17_7uhp3")
-region = Rect2(0, 0, 400, 400)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_lecp7"]
-atlas = ExtResource("18_nmo1w")
-region = Rect2(0, 0, 400, 400)
+[sub_resource type="AtlasTexture" id="AtlasTexture_6ofks"]
+atlas = ExtResource("16_wkske")
+region = Rect2(192, 0, 96, 96)
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_pdjgy"]
 animations = [{
@@ -751,25 +742,27 @@ animations = [{
 }, {
 "frames": [{
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_8wyqu")
+"texture": SubResource("AtlasTexture_8fjfe")
 }, {
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_24cv4")
+"texture": SubResource("AtlasTexture_856ky")
 }, {
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_7a3wl")
+"texture": SubResource("AtlasTexture_4afd7")
+}],
+"loop": true,
+"name": &"wall_jump",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_k8nyd")
 }, {
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_2gm5t")
+"texture": SubResource("AtlasTexture_4qmtk")
 }, {
 "duration": 1.0,
-"texture": SubResource("AtlasTexture_tqm1m")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_vg0ma")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_lecp7")
+"texture": SubResource("AtlasTexture_6ofks")
 }],
 "loop": true,
 "name": &"wall_slide",
@@ -1229,9 +1222,10 @@ shape = SubResource("CapsuleShape2D_pwo0r")
 position = Vector2(-1, -27)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_pdjgy")
-animation = &"new_animation"
+animation = &"attack1"
 
 [node name="GroundSlamArea" type="Area2D" parent="."]
+visible = false
 collision_layer = 32
 collision_mask = 16
 
@@ -1249,11 +1243,11 @@ visible = false
 position = Vector2(-2, 38)
 shape = SubResource("CapsuleShape2D_a6pnd")
 
-[node name="AttackArea" type="Area2D" parent="."]
-visible = false
+[node name="AttackArea" type="Area2D" parent="." groups=["player_attack"]]
 collision_layer = 32
-collision_mask = 16
+collision_mask = 80
 monitoring = false
+monitorable = false
 script = ExtResource("22_sh46p")
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="AttackArea"]
@@ -1262,7 +1256,7 @@ polygon = PackedVector2Array(-37, -2, 1, 66, 96, 72, 90, 26, 46, -6)
 [node name="SpecialAttackArea" type="Area2D" parent="."]
 visible = false
 collision_layer = 32
-collision_mask = 16
+collision_mask = 80
 monitoring = false
 monitorable = false
 
@@ -1271,10 +1265,10 @@ position = Vector2(0, -30)
 scale = Vector2(2, 2)
 shape = SubResource("CapsuleShape2D_a3ls5")
 
-[node name="EffectManager" type="Node2D" parent="."]
+[node name="PlayerEffectManager" type="Node2D" parent="."]
 script = ExtResource("14_0086w")
 
-[node name="DoubleJumpEffect" type="AnimatedSprite2D" parent="EffectManager"]
+[node name="DoubleJumpEffect" type="AnimatedSprite2D" parent="PlayerEffectManager"]
 z_index = 1
 position = Vector2(0, 80)
 scale = Vector2(1.2, 1.2)
@@ -1283,7 +1277,7 @@ animation = &"smoke"
 frame = 9
 frame_progress = 1.0
 
-[node name="DashEffect" type="AnimatedSprite2D" parent="EffectManager"]
+[node name="DashEffect" type="AnimatedSprite2D" parent="PlayerEffectManager"]
 position = Vector2(-30, 80)
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_egsgi")
@@ -1291,18 +1285,18 @@ animation = &"dash"
 frame = 7
 frame_progress = 1.0
 
-[node name="ChargeCompleteEffect" type="AnimatedSprite2D" parent="EffectManager"]
+[node name="ChargeCompleteEffect" type="AnimatedSprite2D" parent="PlayerEffectManager"]
 position = Vector2(7, 44)
 sprite_frames = SubResource("SpriteFrames_d0inn")
 frame_progress = 1.0
 
-[node name="ChargeEffect" type="AnimatedSprite2D" parent="EffectManager"]
+[node name="ChargeEffect" type="AnimatedSprite2D" parent="PlayerEffectManager"]
 position = Vector2(7, 44)
 sprite_frames = SubResource("SpriteFrames_wijj2")
 frame = 9
 frame_progress = 1.0
 
-[node name="HealEffect" type="AnimatedSprite2D" parent="EffectManager"]
+[node name="HealEffect" type="AnimatedSprite2D" parent="PlayerEffectManager"]
 position = Vector2(0, -1)
 sprite_frames = SubResource("SpriteFrames_o8by3")
 animation = &"HealEffect"
@@ -1363,7 +1357,7 @@ fall_state = NodePath("../Fall")
 script = ExtResource("34_pa3c0")
 
 [node name="Jump" type="Node" parent="StateMachine" node_paths=PackedStringArray("fall_state", "attack_state", "special_attack_state", "dash_state", "wall_slide_state")]
-script = ExtResource("23_4ug8u")
+script = ExtResource("31_h11jm")
 fall_state = NodePath("../Fall")
 attack_state = NodePath("../Attack")
 special_attack_state = NodePath("../SpecialAttack")
@@ -1394,6 +1388,6 @@ position = Vector2(14, 44)
 target_position = Vector2(13, 0)
 
 [connection signal="health_changed" from="." to="." method="_on_health_changed"]
-[connection signal="effect_finished" from="EffectManager" to="." method="_on_effect_manager_effect_finished"]
-[connection signal="animation_finished" from="EffectManager/DoubleJumpEffect" to="." method="_on_double_jump_effect_animation_finished"]
+[connection signal="effect_finished" from="PlayerEffectManager" to="." method="_on_effect_manager_effect_finished"]
+[connection signal="animation_finished" from="PlayerEffectManager/DoubleJumpEffect" to="." method="_on_double_jump_effect_animation_finished"]
 [connection signal="room_changed" from="MetroidvaniaSystem" to="MetroidvaniaSystem" method="_on_room_changed"]

@@ -44,6 +44,10 @@ enabled=PackedStringArray("res://addons/MetroidvaniaSystem/EditorExtension/plugi
 TransitionScreen=false
 transition_screen=false
 
+[global_group]
+
+player_attack=""
+
 [input]
 
 move_left={

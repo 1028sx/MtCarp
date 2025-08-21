@@ -1,6 +1,6 @@
-[gd_scene load_steps=54 format=3 uid="uid://c40rej1wugna7"]
+[gd_scene load_steps=53 format=3 uid="uid://c40rej1wugna7"]
 
-[ext_resource type="Script" path="res://scripts/enemies/chicken.gd" id="1_6v8xf"]
+[ext_resource type="Script" path="res://scripts/enemies/chicken/chicken.gd" id="1_mtfed"]
 [ext_resource type="Texture2D" uid="uid://b1tnkke5rbv5n" path="res://assets/enemies/chicken/Sprite-ChickenAttack-Sheet.png" id="2_5u8p3"]
 [ext_resource type="Texture2D" uid="uid://4x1htrxmw7f0" path="res://assets/enemies/chicken/ChickenDie-Sheet.png" id="3_x77i6"]
 [ext_resource type="Texture2D" uid="uid://bpcn70i1lrbqh" path="res://assets/enemies/chicken/ChickenDamage-Sheet.png" id="4_8dysq"]
@@ -337,45 +337,57 @@ radius = 355.023
 [sub_resource type="CircleShape2D" id="CircleShape2D_vqsbp"]
 radius = 10.4403
 
-[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_o2ywt"]
-radius = 19.0
-height = 48.0
-
 [node name="chicken" type="CharacterBody2D" groups=["enemy"]]
 collision_layer = 4
-collision_mask = 3
-script = ExtResource("1_6v8xf")
+script = ExtResource("1_mtfed")
+jump_obstacle_raycast_path = NodePath("RayCast2D")
+hitbox_area = NodePath("Hitbox")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 scale = Vector2(2, 2)
 sprite_frames = SubResource("SpriteFrames_ncj60")
-animation = &"jump"
+animation = &"attack"
+frame = 9
+frame_progress = 1.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 rotation = 1.5708
 shape = SubResource("CapsuleShape2D_46xi6")
 
-[node name="DetectionArea" type="Area2D" parent="."]
-collision_layer = 0
+[node name="TouchDamageArea" type="Area2D" parent="."]
+collision_layer = 128
 collision_mask = 2
-
-[node name="CircleShape2D" type="CollisionShape2D" parent="DetectionArea"]
-shape = SubResource("CircleShape2D_htx4c")
-
-[node name="AttackArea" type="Area2D" parent="." groups=["enemy"]]
-collision_layer = 64
-collision_mask = 8
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackArea"]
-position = Vector2(-6, -3)
-shape = SubResource("CircleShape2D_vqsbp")
 
 [node name="Hitbox" type="Area2D" parent="."]
 collision_layer = 16
 collision_mask = 32
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Hitbox"]
-rotation = 1.5708
-shape = SubResource("CapsuleShape2D_o2ywt")
+[node name="DetectionArea" type="Area2D" parent="."]
+visible = false
+collision_layer = 128
+collision_mask = 2
 
-[node name="AttackTimer" type="Timer" parent="."]
+[node name="CircleShape2D" type="CollisionShape2D" parent="DetectionArea"]
+shape = SubResource("CircleShape2D_htx4c")
+
+[node name="AttackAreaRight" type="Area2D" parent="." groups=["enemy"]]
+position = Vector2(33, 0)
+collision_layer = 128
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackAreaRight"]
+position = Vector2(-12, 0)
+shape = SubResource("CircleShape2D_vqsbp")
+
+[node name="AttackAreaLeft" type="Area2D" parent="." groups=["enemy"]]
+position = Vector2(66, 0)
+collision_layer = 128
+collision_mask = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="AttackAreaLeft"]
+position = Vector2(-88, 0)
+shape = SubResource("CircleShape2D_vqsbp")
+
+[node name="AttackCooldownTimer" type="Timer" parent="."]
+
+[node name="RayCast2D" type="RayCast2D" parent="."]

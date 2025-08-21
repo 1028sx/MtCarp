@@ -1,13 +1,5 @@
-extends EnemyAIBase
+extends "res://scripts/enemies/base/enemy_ai_base.gd"
 
-# 載入我們需要的通用狀態和弓箭手專屬狀態
-const IdleState = preload("res://scripts/enemies/base/states/common/IdleState.gd")
-const WanderState = preload("res://scripts/enemies/base/states/common/WanderState.gd")
-const ArcherChaseState = preload("res://scripts/enemies/archer/states/ArcherChaseState.gd")
-const ArcherAttackState = preload("res://scripts/enemies/archer/states/ArcherAttackState.gd")
-const HurtState = preload("res://scripts/enemies/base/states/common/HurtState.gd")
-const DeadState = preload("res://scripts/enemies/base/states/common/DeadState.gd")
-const ArcherHoldPositionState = preload("res://scripts/enemies/archer/states/ArcherHoldPositionState.gd")
 
 @export_group("理想距離區間")
 @export var optimal_attack_range_min: float = 150.0 # 理想攻擊距離下限
@@ -30,22 +22,19 @@ var locked_target_position: Vector2 = Vector2.ZERO # 新增：用於儲存鎖定
 
 
 func _ready() -> void:
-	super._ready() # 非常重要：呼叫父類別的 _ready() 以初始化形狀共享等功能
+	super._ready()
 	
-	# 新：使用基礎類別的系統來註冊我們感興趣的區域
 	register_zone("in_attack_zone", $AttackArea)
 	register_zone("in_retreat_zone", $RetreatRangeArea)
 	
-	# 建立並註冊所有狀態
-	add_state("Idle", IdleState.new())
-	add_state("Wander", WanderState.new())
+	add_state("Idle", EnemyIdleState.new())
+	add_state("Wander", EnemyWanderState.new())
 	add_state("Chase", ArcherChaseState.new())
 	add_state("Attack", ArcherAttackState.new())
-	add_state("Hurt", HurtState.new())
-	add_state("Dead", DeadState.new())
+	add_state("Hurt", ArcherHurtState.new())
+	add_state("Dead", EnemyDeadState.new())
 	add_state("HoldPosition", ArcherHoldPositionState.new())
 	
-	# 設定初始狀態
 	change_state("Idle")
 
 	if health_bar:
@@ -55,15 +44,6 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta) # 調用父類的 _physics_process
 	
-	# 每幀主動檢查玩家是否在後退區，作為唯一的真相來源
-	# _check_player_in_retreat_zone() # 已被新的距離判斷邏輯取代
-	
-	# 移除：威脅評估系統
-	# _update_threat_level(delta)
-	
-	# DEBUG: 監控威脅值的變化
-	#if Engine.is_editor_hint():
-		#print("Threat Level: ", _threat_level)
 
 #region 動畫名稱覆寫
 func _get_idle_animation() -> String:

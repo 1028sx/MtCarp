@@ -10,12 +10,18 @@ ORIGINAL_README.md
 # Tooling and backup directories
 godot-mcp/
 /backups/
-backup/
-
-# Development and planning documents
-GIANT_FISH_REFACTOR_PLAN.md
-CLAUDE.md
 
 # Editor-specific settings
 .vscode/
-.cursor/
+
+# Temporary and log files
+*.tmp
+*.log
+nul
+
+# Export and build files
+export_presets.cfg
+.import/
+
+# Claude Code specific
+.claude/

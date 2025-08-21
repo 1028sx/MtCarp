@@ -1,6 +1,5 @@
 extends CharacterBody2D
 
-# Preload the PlayerGlobal script resource to call static functions from the type
 const PlayerGlobalScript = preload("res://scripts/globals/PlayerGlobal.gd")
 
 #region 常量定義
@@ -57,7 +56,7 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @onready var animated_sprite = $AniSprite2D
 @onready var collision_shape = $CollisionShape2D
 @onready var attack_area = $AttackArea
-@onready var effect_manager = $EffectManager
+@onready var player_effect_manager = $PlayerEffectManager
 @onready var special_attack_area = $SpecialAttackArea
 @onready var camera = $Camera2D
 @onready var state_machine = $StateMachine
@@ -125,7 +124,7 @@ var is_charge_ready := false
 var saved_charge_multiplier := 1.0
 
 var base_attack_damage := 50.0
-var base_special_attack_damage := 30.0
+var base_special_attack_damage := 25.0
 var current_attack_damage: float
 var current_special_attack_damage: float
 
@@ -182,12 +181,25 @@ var is_wall_sliding := false
 var last_jump_was_wall_jump := false
 var is_double_jumping_after_wall_jump := false
 var _took_damage_this_frame := false
+
+# 禁錮系統變數
+var is_imprisoned: bool = false
+var imprisoning_source: Node = null
+
+# 定期狀態檢查計時器
+var imprisonment_check_timer: float = 0.0
+var imprisonment_check_interval: float = 1.5  # 每1.5秒檢查一次（略不同於泡泡，避免同步）
+
+# 性能優化：緩存驗證結果
+var source_validity_cache: bool = true          # 緩存泡泡源有效性
+var last_source_validity_check: float = 0.0     # 上次檢查時間
+var source_validity_cache_duration: float = 0.1 # 緩存持續時間（100ms）
+var original_modulate: Color = Color.WHITE
 #endregion
 
 #region 生命週期函數
 func _ready() -> void:
 	_initialize_player()
-	_setup_collisions()
 	_connect_signals()
 	_connect_death_state_signal()
 	current_attack_damage = base_attack_damage
@@ -202,6 +214,18 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_took_damage_this_frame = false
+	
+	# 如果被禁錮，禁用正常移動控制
+	if is_imprisoned:
+		# 定期狀態檢查
+		imprisonment_check_timer += delta
+		if imprisonment_check_timer >= imprisonment_check_interval:
+			_validate_imprisonment_state_player()
+			imprisonment_check_timer = 0.0
+			
+		_update_global_timers(delta)
+		return
+		
 	if _handle_camera_mode(delta):
 		return
 		
@@ -209,8 +233,6 @@ func _physics_process(delta: float) -> void:
 
 	if state_machine and state_machine.current_state: 
 		state_machine._physics_process(delta)
-	else:
-		printerr("[Player] Error: Invalid State Machine or Current State in _physics_process!")
 
 	_handle_ground_slam_input()
 
@@ -247,35 +269,6 @@ func _initialize_player() -> void:
 	current_health = max_health
 	gold = 0
 
-func _setup_collisions() -> void:
-	# set_collision_layer_value(2, true)  # Player layer
-	# set_collision_mask_value(1, true)   # Detect Environment
-	
-	# var hitbox = $Hitbox
-	# if hitbox:
-		# hitbox.set_collision_layer_value(3, true) # PlayerHitbox layer (assuming layer 3 is PlayerHitbox)
-		# hitbox.set_collision_mask_value(4, true)  # Detect EnemyAttack layer (assuming layer 4 is EnemyAttack)
-	
-	# if attack_area:
-		# attack_area.set_collision_layer_value(4, true) # PlayerAttack layer (assuming layer 4 is PlayerAttack)
-		# attack_area.set_collision_mask_value(3, true)  # Detect EnemyHitbox layer (assuming layer 3 is EnemyHitbox)
-
-	# if special_attack_area:
-		# special_attack_area.collision_layer = 0
-		# special_attack_area.collision_mask = 0
-		
-		# special_attack_area.set_collision_layer_value(4, true) # PlayerAttack layer
-		# special_attack_area.set_collision_mask_value(3, true)  # Detect EnemyHitbox layer
-		
-		# # 確保特殊攻擊區域預設為禁用狀態
-		# special_attack_area.monitoring = false
-		# special_attack_area.monitorable = false
-	
-	# ground_slam_area = $GroundSlamArea
-	# if ground_slam_area:
-		# ground_slam_area.monitoring = false
-		# ground_slam_area.monitorable = false
-	pass # 保留函數定義，但內容被註解掉
 
 func _connect_signals() -> void:
 	if animated_sprite:
@@ -288,31 +281,20 @@ func _connect_signals() -> void:
 	if hitbox and not hitbox.area_entered.is_connected(_on_hitbox_area_entered):
 		hitbox.area_entered.connect(_on_hitbox_area_entered)
 	
-	if effect_manager and not effect_manager.effect_finished.is_connected(_on_effect_finished):
-		effect_manager.effect_finished.connect(_on_effect_finished)
+	if player_effect_manager and not player_effect_manager.effect_finished.is_connected(_on_effect_finished):
+		player_effect_manager.effect_finished.connect(_on_effect_finished)
 
 func _connect_death_state_signal() -> void:
-	# 使用 call_deferred 確保狀態機和狀態節點已準備好
 	call_deferred("_deferred_connect_death_state_signal")
 
 func _deferred_connect_death_state_signal() -> void:
 	if state_machine and state_machine.states.has("dead"):
-		var dead_state = state_machine.states.get("dead") # 使用 .get() 更安全
-		if is_instance_valid(dead_state): # 檢查實例是否有效
+		var dead_state = state_machine.states.get("dead")
+		if is_instance_valid(dead_state):
 			if not dead_state.death_animation_truly_finished.is_connected(_on_death_animation_truly_finished):
-				var error_code = dead_state.death_animation_truly_finished.connect(_on_death_animation_truly_finished)
-				if error_code != OK:
-					printerr("[Player] Failed to connect to State_Dead.death_animation_truly_finished. Error: ", error_code)
-				else:
-					print_debug("[Player] Successfully connected to State_Dead.death_animation_truly_finished.")
-		else:
-			printerr("[Player] 'dead' state instance is invalid in _deferred_connect_death_state_signal.")
-	else:
-		printerr("[Player] Could not find 'dead' state in StateMachine to connect signal in _deferred_connect_death_state_signal.")
+				dead_state.death_animation_truly_finished.connect(_on_death_animation_truly_finished)
 
-# 這是 state_dead 動畫播放完畢後的回調
 func _on_death_animation_truly_finished():
-	print_debug("[Player] Death animation truly finished (received from state_dead). Emitting player_fully_died.")
 	player_fully_died.emit()
 
 #endregion
@@ -395,107 +377,58 @@ func _adjust_camera_zoom(delta_zoom: float) -> void:
 
 #region 戰鬥系統 (受傷和死亡)
 func take_damage(amount: float, attacker: Node = null) -> void:
-	print("--------------------------------------------------")
-	print("[Player_take_damage] CALLED!")
-	print("- Timestamp: ", Time.get_ticks_msec())
-	print("- Damage Amount: ", amount)
-	if attacker:
-		print("- Attacker Name: ", attacker.name)
-		print("- Attacker Path: ", attacker.get_path())
-		print("- Attacker Type: ", attacker.get_class())
-		if attacker.owner and attacker.owner != attacker: # 避免重複打印自身
-			print("- Attacker Owner Name: ", attacker.owner.name)
-			print("- Attacker Owner Path: ", attacker.owner.get_path())
-			print("- Attacker Owner Type: ", attacker.owner.get_class())
-		print("- Attacker Global Position: ", str(attacker.global_position) if attacker is Node2D else "N/A (Attacker not Node2D)")
-		print("- Player Global Position: ", global_position)
-		print("- Distance to Attacker: ", str(global_position.distance_to(attacker.global_position)) if attacker is Node2D else "N/A")
-	else:
-		print("- Attacker: null (Damage might be environmental or self-inflicted)")
-	print("- Current Player State: ", String(state_machine.current_state.name) if state_machine and state_machine.current_state else "N/A")
-	print("- Is Invincible Flag: ", is_invincible)
-	print("- Is Dashing (State Check): ", str(state_machine.current_state is state_dash) if state_machine and state_machine.current_state else "N/A")
-	print("--------------------------------------------------")
-
-	# 1. Check for full invincibility (Dash or general invincible flag)
-	if is_invincible or (state_machine and state_machine.current_state is state_dash):
-		print("[Player_take_damage] Damage ignored due to invincibility or Dash state.")
-		return # No damage, no effects, no interruption
+	if is_invincible or is_imprisoned or (state_machine and state_machine.current_state is PlayerDashState):
+		return
 		
-	# 2. Apply damage
-	var previous_health = current_health
+
 	current_health -= amount
-	print("[Player_take_damage] Health changed from %s to %s (Damage: %s)" % [previous_health, current_health, amount])
 	
-	# 3. Emit health signal
 	health_changed.emit(current_health)
 	
-	# 4. Apply unconditional on-hit effects (apply regardless of interruption)
-	# Example: Thorns damage back to attacker
 	if active_effects.has("thorns") and attacker != null:
 		var real_attacker = attacker
 		if attacker.has_method("get_shooter"):
 			real_attacker = attacker.get_shooter()
 		if real_attacker != null and real_attacker.has_method("take_damage"):
-			# 注意：避免無限遞迴，Thorns 傷害不應觸發 Thorns
-			# 可以傳遞一個標誌，或者確保 Thorns 傷害源不同
-			print("[Player_take_damage] Applying Thorns damage back.")
-			real_attacker.call("take_damage", amount * 5.0) # 假設傷害倍數是 5.0
+			real_attacker.call("take_damage", amount * 5.0)
 	
-	# Example: Gain Rage stack on taking damage
 	if active_effects.has("rage") and rage_stack < rage_stack_limit:
 		rage_stack += 1
 		_update_rage_damage()
-		print("[Player_take_damage] Rage stack increased to: %s" % rage_stack)
 
-	# 5. Check for death
 	if current_health <= 0:
+		# 防止重複處理死亡
+		if state_machine and state_machine.current_state is PlayerDeadState:
+			return
+		
 		if has_revive_heart:
 			has_revive_heart = false
-			current_health = float(max_health) / 2.0 # Restore half health
+			current_health = float(max_health) / 2.0
 			health_changed.emit(current_health)
 			var ui = get_tree().get_first_node_in_group("ui")
 			if ui and ui.has_method("use_revive_heart"):
 				ui.use_revive_heart()
-			set_invincible(2.0) # Grant invincibility after revive
-			print("[Player_take_damage] Player Revived! Granted 2s invincibility.")
-			# Consider transitioning to a specific state after revive if needed
-			# if state_machine and state_machine.states.has("idle"):
-			# state_machine._transition_to(state_machine.states["idle"])
+			set_invincible(2.0)
 		else:
-			# Actual Death
-			print("[Player_take_damage] Player Died! Initiating death state.")
-			set_physics_process(false) # Stop player physics
-			set_process_input(false) # Stop player input
+			set_physics_process(false)
+			set_process_input(false)
 			
-			# Transition to death state
 			if state_machine and state_machine.states.has("dead"):
 				state_machine._transition_to(state_machine.states["dead"])
 			else:
-				printerr("[Player_take_damage] Error: 'dead' state not found in StateMachine!")
-				# If no death state, we might need to manually emit the fully_died signal here
-				# as a fallback, or consider this a critical error.
-				# For now, assume death state handles emitting via its animation.
-				# If State_Dead might not exist or its animation signal might not fire,
-				# emitting here would be a backup.
-				# player_fully_died.emit() # Fallback if no proper death state path
-				if animated_sprite: 
-					animated_sprite.stop() # Stop animation if no death state
+				# 後備方案：直接發出死亡信號
+				player_fully_died.emit()
 			
-			# died.emit() # Signal that player died <--- REMOVED/COMMENTED OUT
-			# The 'player_fully_died' signal will be emitted by _on_death_animation_truly_finished
-			# after the State_Dead has confirmed its animation is complete.
-		return # Stop further processing after death/revive
+		return
 
 	# 6. Handle interruption vs Super Armor (only if not dead and not invincible/dashing)
 	var has_super_armor = false
 	# 檢查當前狀態是否提供霸體 (目前只有 SpecialAttack)
-	if state_machine and state_machine.current_state is state_special_attack:
+	if state_machine and state_machine.current_state is PlayerSpecialAttackState:
 		has_super_armor = true
 
 	if not has_super_armor:
 		# --- Interruption Logic --- (沒有霸體，正常受傷反應)
-		print("[Player_take_damage] Interrupted (No Super Armor)!")
 
 		# 重置連擊 (如果需要)
 		var game_manager = get_tree().get_first_node_in_group("game_manager")
@@ -505,25 +438,13 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		# 轉換到 Hurt 狀態
 		if state_machine and state_machine.states.has("hurt"):
 			state_machine._transition_to(state_machine.states["hurt"])
-		else:
-			printerr("[Player_take_damage] Hurt state not found!")
-			
-		# set_invincible(invincible_duration) # 這行現在是多餘的，因為我們在 area_entered 中已經設置了
 		set_invincible(invincible_duration) # 將無敵時間的賦予移回到這裡
 		
 		# 重置因被打斷而應取消的狀態或能力
-		print("[Player_take_damage] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
 		last_jump_was_wall_jump = false
 		is_double_jumping_after_wall_jump = false
 		set_can_ground_slam(false) # 只有在被打斷時才取消地面衝擊能力
 		reset_charge_state() # 只有在被打斷時才取消蓄力
-	else:
-		# --- Super Armor Logic --- (有霸體)
-		print("[Player_take_damage] Super Armor absorbed interruption!")
-		# 不轉換到 Hurt 狀態
-		# 不重置 can_perform_ground_slam
-		# 不重置 charge_state
-		# 不重置 combo (取決於你的設計，但通常霸體不重置連擊)
 
 func set_invincible(duration: float) -> void:
 	if duration > 0:
@@ -557,7 +478,7 @@ func _on_ani_sprite_2d_frame_changed() -> void:
 		state_machine.current_state.on_frame_changed(animated_sprite.frame)
 
 func _on_hitbox_area_entered(area: Area2D) -> void:
-	if is_invincible or (state_machine and state_machine.current_state is state_dash) or _took_damage_this_frame:
+	if is_invincible or (state_machine and state_machine.current_state is PlayerDashState) or _took_damage_this_frame:
 		return
 		
 	if area.get_parent().is_in_group("enemy"):
@@ -615,7 +536,6 @@ func _update_cooldowns(delta: float) -> void:
 			can_special_attack = true
 
 func _on_landed() -> void:
-	print("[Player_on_landed] Attempting to reset can_perform_ground_slam. Current value:", can_perform_ground_slam)
 	jump_count = 0
 	coyote_timer = coyote_time
 	last_jump_was_wall_jump = false
@@ -646,8 +566,8 @@ func reset_charge_state() -> void:
 		has_played_first_effect = false
 		has_played_second_effect = false
 		has_played_max_charge_effect = false
-		if effect_manager:
-			effect_manager.stop_charge_effect()
+		if player_effect_manager:
+			player_effect_manager.stop_charge_effect()
 
 func get_raycast_wall_normal() -> Vector2:
 	if not is_node_ready() or not wall_check_left or not wall_check_right:
@@ -786,15 +706,15 @@ func _handle_charge_state(delta: float) -> void:
 	var previous_multiplier = charge_damage_multiplier
 	charge_damage_multiplier = min(1.0 + (charge_time * max_charge_bonus), 6.0)
 	
-	if effect_manager:
+	if player_effect_manager:
 		if previous_multiplier < 1.2 and charge_damage_multiplier >= 1.2 and not has_played_first_effect:
-			effect_manager.play_charge_effect(1.2)
+			player_effect_manager.play_charge_effect(1.2)
 			has_played_first_effect = true
 		elif previous_multiplier < 3.0 and charge_damage_multiplier >= 3.0 and not has_played_second_effect:
-			effect_manager.play_charge_effect(3.0)
+			player_effect_manager.play_charge_effect(3.0)
 			has_played_second_effect = true
 		elif previous_multiplier < 5.0 and charge_damage_multiplier >= 5.0 and not has_played_max_charge_effect:
-			effect_manager.play_charge_complete_effect()
+			player_effect_manager.play_charge_complete_effect()
 			has_played_max_charge_effect = true
 
 func enable_charge_attack(_max_bonus: float, _charge_rate: float) -> void:
@@ -833,8 +753,8 @@ func reset_all_states() -> void:
 	is_charge_ready = false
 	max_charge_bonus = 1.0
 	current_charge_rate = 0.15
-	if effect_manager:
-		effect_manager.stop_charge_effect()
+	if player_effect_manager:
+		player_effect_manager.stop_charge_effect()
 	
 	current_health = max_health
 	
@@ -967,8 +887,8 @@ func disable_charge_attack() -> void:
 	charge_start_timer = 0.0
 	is_charge_ready = false
 	
-	if effect_manager:
-		effect_manager.stop_charge_effect()
+	if player_effect_manager:
+		player_effect_manager.stop_charge_effect()
 
 func _update_rage_damage() -> void:
 	var total_bonus = rage_stack * rage_damage_bonus
@@ -1010,14 +930,14 @@ func start_ice_freeze_attack() -> void:
 	
 	ice_freeze_timer = ice_freeze_cooldown
 	
-	if effect_manager:
-		effect_manager.play_ice_effect()
+	if player_effect_manager:
+		player_effect_manager.play_ice_effect()
 
 func restore_health() -> void:
 	current_health = max_health
 	health_changed.emit(current_health)
-	if effect_manager:
-		effect_manager.play_heal_effect()
+	if player_effect_manager:
+		player_effect_manager.play_heal_effect()
 
 func restore_lives() -> void:
 	has_revive_heart = true
@@ -1027,42 +947,150 @@ func restore_lives() -> void:
 
 func _handle_ground_slam_input() -> void:
 	if Input.is_action_just_pressed("ground_slam"):
-		# print(f"[Player] Ground Slam Input: can_perform={can_perform_ground_slam}, not_on_floor={not is_on_floor()}, state={state_machine.current_state.name if state_machine and state_machine.current_state else 'N/A'}")
-		print("[Player] Ground Slam Input: can_perform=%s, not_on_floor=%s, state=%s, jump_count=%s, max_jumps=%s" % [
-			can_perform_ground_slam, 
-			not is_on_floor(), 
-			state_machine.current_state.name if state_machine and state_machine.current_state else "N/A",
-			jump_count,
-			max_jumps
-		])
 		
 		if can_perform_ground_slam and not is_on_floor():
-			if state_machine:
-				if state_machine.states.has("groundslam"): 
-					print("[Player] 執行地面衝擊")
-					state_machine._transition_to(state_machine.states["groundslam"])
-				else:
-					printerr("[Player] Error: 'groundslam' state not found in StateMachine states dictionary!")
-			else:
-				printerr("[Player] Error: StateMachine node not found!")
-		else:
-			print("[Player] 不能執行地面衝擊: 條件不滿足")
-			if is_on_floor():
-				print("[Player] - 原因: 玩家在地面上")
-			if not can_perform_ground_slam:
-				print("[Player] - 原因: can_perform_ground_slam = false")
+			if state_machine and state_machine.states.has("groundslam"): 
+				state_machine._transition_to(state_machine.states["groundslam"])
 
 # Setter function for can_perform_ground_slam with logging
 func set_can_ground_slam(value: bool) -> void:
 	if can_perform_ground_slam != value: 
-		var old_value = can_perform_ground_slam
 		can_perform_ground_slam = value
-		# print(f"[Player_set_can_ground_slam] Value changed from {old_value} to {can_perform_ground_slam}. Caller: {get_stack()[1] if get_stack().size() > 1 else 'Unknown'}")
-		print("[Player_set_can_ground_slam] Value changed from %s to %s. Caller: %s" % [old_value, can_perform_ground_slam, get_stack()[1] if get_stack().size() > 1 else "Unknown"])
 
 #region 輔助方法
 func get_health_percentage() -> float:
 	if max_health > 0:
 		return float(current_health) / max_health
 	return 0.0
+#endregion
+
+#region 禁錮系統函數
+func enter_imprisonment(bubble: Node):
+	"""進入禁錮狀態"""
+	print_debug("[Player] 進入禁錮狀態，泡泡: %s" % bubble)
+	
+	# 保存原始顏色
+	original_modulate = modulate
+	
+	# 設置禁錮狀態
+	is_imprisoned = true
+	imprisoning_source = bubble
+	_invalidate_source_cache()  # 緩存失效，因為泡泡源改變
+	
+	# 套用藍色調制效果
+	modulate = Color(0.7, 0.7, 1.0, 1.0)
+	
+	# 停止當前速度
+	velocity = Vector2.ZERO
+	
+	# 重置狀態檢查計時器
+	imprisonment_check_timer = 0.0
+	
+	print_debug("[Player] 禁錮狀態已建立")
+
+func exit_imprisonment():
+	"""退出禁錮狀態"""
+	if not is_imprisoned:
+		return
+		
+	print_debug("[Player] 退出禁錮狀態")
+	
+	# 強制重置所有視覺特效
+	modulate = Color.WHITE      # 強制重置為白色，不依賴 original_modulate
+	rotation = 0.0              # 清除旋轉效果
+	
+	# 重置禁錮狀態
+	is_imprisoned = false
+	imprisoning_source = null
+	imprisonment_check_timer = 0.0  # 重置檢查計時器
+	_invalidate_source_cache()  # 緩存失效，因為泡泡源改變
+	
+	# 恢復正常物理
+	velocity = Vector2.ZERO
+	
+	# 確保沒有其他視覺效果殘留
+	if animated_sprite:
+		animated_sprite.rotation = 0.0  # 確保精靈也沒有旋轉
+	
+	print_debug("[Player] 禁錮狀態已解除，所有特效已清除")
+
+func _process_imprisonment_movement():
+	"""處理禁錮時的移動同步"""
+	# 使用緩存的快速檢查，避免每幀調用 is_instance_valid()
+	if not imprisoning_source or not _is_imprisoning_source_valid_cached():
+		exit_imprisonment()
+		return
+	
+	# 添加位置偏移，讓玩家看起來在泡泡內部
+	var player_offset = Vector2(0, -50)  # 向上偏移50像素
+	global_position = imprisoning_source.global_position + player_offset
+	
+	# 同步旋轉效果（讓玩家也跟著旋轉）
+	rotation = imprisoning_source.rotation * 0.5  # 稍微減少旋轉幅度避免眩暈
+
+func _validate_imprisonment_state_player() -> bool:
+	"""驗證禁錮狀態的一致性（玩家端）"""
+	if not is_imprisoned:
+		return true  # 不在禁錮狀態，無需驗證
+	
+	if not imprisoning_source:
+		print_debug("[Player] 🔧 狀態修復 - 處於禁錮狀態但無泡泡源")
+		exit_imprisonment()
+		return false
+		
+	if not is_instance_valid(imprisoning_source):
+		print_debug("[Player] 🔧 狀態修復 - 泡泡源已失效，自動清理狀態")
+		exit_imprisonment()
+		return false
+		
+	# 檢查泡泡端狀態是否與玩家端一致
+	if imprisoning_source.current_state != 2 or imprisoning_source.imprisoned_player != self:  # 2 = IMPRISONING
+		print_debug("[Player] 🔧 狀態不同步 - 泡泡端與玩家端狀態不符")
+		print_debug("[Player] 詳細信息: 泡泡狀態=%s (期望=2), imprisoned_player=%s (期望=%s)" % [imprisoning_source.current_state, imprisoning_source.imprisoned_player, self])
+		exit_imprisonment()
+		return false
+	
+	return true  # 狀態一致
+
+func get_imprisonment_debug_status() -> Dictionary:
+	"""獲取禁錮系統調試狀態信息"""
+	return {
+		"player_id": get_instance_id(),
+		"is_imprisoned": is_imprisoned,
+		"imprisoning_source": imprisoning_source,
+		"imprisoning_source_valid": is_instance_valid(imprisoning_source) if imprisoning_source else false,
+		"imprisoning_source_state": imprisoning_source.current_state if imprisoning_source and is_instance_valid(imprisoning_source) else "N/A",
+		"position": global_position,
+		"modulate": modulate,
+		"rotation": rotation,
+		"check_timer": "%.1f/%.1f" % [imprisonment_check_timer, imprisonment_check_interval]
+	}
+
+func print_imprisonment_debug_status():
+	"""打印禁錮調試狀態（用於故障排除）"""
+	var status = get_imprisonment_debug_status()
+	print_debug("[Player] 📊 禁錮調試狀態: %s" % status)
+
+func _is_imprisoning_source_valid_cached() -> bool:
+	"""緩存的泡泡源有效性檢查，減少頻繁的 is_instance_valid() 調用"""
+	if not imprisoning_source:
+		source_validity_cache = false
+		return false
+	
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	# 如果緩存還在有效期內，直接返回緩存結果
+	if current_time - last_source_validity_check < source_validity_cache_duration:
+		return source_validity_cache
+	
+	# 緩存過期，重新檢查
+	last_source_validity_check = current_time
+	source_validity_cache = is_instance_valid(imprisoning_source)
+	
+	return source_validity_cache
+
+func _invalidate_source_cache():
+	"""使泡泡源有效性緩存失效（在狀態改變時調用）"""
+	source_validity_cache = false
+	last_source_validity_check = 0.0
 #endregion

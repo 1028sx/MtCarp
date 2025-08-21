@@ -15,41 +15,22 @@ func _enter_tree() -> void:
 		# You might want to make this node process always,
 		# or ensure it's correctly placed in the scene tree if it needs _process or _physics_process
 		# process_mode = Node.PROCESS_MODE_ALWAYS 
-		print("[PlayerGlobal] PlayerGlobal instance created.")
 	else:
 		# If another instance tries to register, queue_free the new one.
 		# This can happen if the autoload is somehow added to the scene manually again.
-		printerr("[PlayerGlobal] Another instance of PlayerGlobal tried to enter the tree. Freeing the new one.")
 		queue_free()
 
 # Called by the Player node to register itself
 func register_player(p_player_node: CharacterBody2D) -> void:
 	if is_instance_valid(p_player_node):
 		player_node = p_player_node
-		# Safer print statement
-		var player_name_for_log : String
-		if is_instance_valid(player_node):
-			player_name_for_log = player_node.name
-		else:
-			player_name_for_log = "invalid_or_null_player_node"
-		print("[PlayerGlobal] Player registered: ", player_name_for_log)
 		player_registration_changed.emit(true)
 	else:
 		player_node = null
-		printerr("[PlayerGlobal] Attempted to register an invalid player node.")
 		player_registration_changed.emit(false)
 
 # Called if the player node is freed or becomes invalid elsewhere
 func unregister_player() -> void:
-	# Safer print statement
-	var player_name_for_log : String
-	if is_instance_valid(player_node):
-		player_name_for_log = player_node.name
-	else:
-		player_name_for_log = "invalid_or_null_player_node_at_unregister"
-		
-	if player_node != null: # Keep the original condition for logging message context
-		print("[PlayerGlobal] Player unregistered: ", player_name_for_log)
 	player_node = null
 	player_registration_changed.emit(false)
 
@@ -75,7 +56,6 @@ static func is_player_available() -> bool:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		if instance == self:
-			print("[PlayerGlobal] PlayerGlobal instance being freed.")
 			if is_instance_valid(player_node):
 				# This might be redundant if the player is also being freed,
 				# but good for cleanup if PlayerGlobal is removed for other reasons.

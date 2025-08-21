@@ -2,16 +2,38 @@ extends "res://scripts/bosses/boss_base.gd"
 
 class_name GiantFish
 
-#region 行動名稱常量
+#region 常量定義
+# 攻擊類型常量
 const ACTION_IDLE = "Idle"
 const ACTION_SIDE_MOVE_ATTACK = "SideMoveAttack" 
 const ACTION_JUMP_ATTACK = "JumpAttack"        
 const ACTION_TAIL_SWIPE_ATTACK = "TailSwipeAttack"
 const ACTION_BUBBLE_ATTACK = "BubbleAttack"
-const ACTION_REPOSITION = "Reposition" # 新增：重新佈局動作
+
+# 平衡常量
+const WATER_SPLASH_SPACING = 80.0
+const PHASE_TWO_HEALTH_THRESHOLD = 0.5
+const CLOSE_RANGE_DISTANCE = 250.0
+const FAR_RANGE_DISTANCE = 600.0
+
+# 攻擊冷卻時間
+const ATTACK_COOLDOWNS = {
+	ACTION_TAIL_SWIPE_ATTACK: 3.0,
+	ACTION_BUBBLE_ATTACK: 4.0,
+	ACTION_SIDE_MOVE_ATTACK: 6.0,
+	ACTION_JUMP_ATTACK: 8.0
+}
+
+# 攻擊準備時間
+const PREPARE_TIMES = {
+	ACTION_TAIL_SWIPE_ATTACK: 0.8,
+	ACTION_BUBBLE_ATTACK: 0.6,
+	ACTION_SIDE_MOVE_ATTACK: 1.0,
+	ACTION_JUMP_ATTACK: 1.2
+}
 #endregion
 
-#region 巨魚特有狀態
+#region 狀態定義
 enum GiantFishState {
 	IDLE = BossBase.BossState.IDLE,
 	APPEAR = BossBase.BossState.APPEAR,
@@ -19,134 +41,137 @@ enum GiantFishState {
 	HURT = BossBase.BossState.HURT,
 	DEFEATED = BossBase.BossState.DEFEATED,
 	PHASE_TRANSITION = BossBase.BossState.PHASE_TRANSITION,
-
+	
+	# Giant Fish 特有狀態
 	DIVE = BossBase.BossState.MAX_BOSS_STATES,
 	SUBMERGED_MOVE,
 	EMERGE_JUMP,
-	# 擺尾攻擊狀態
 	TAIL_SWIPE, 
-	# 吐泡泡攻擊狀態
 	BUBBLE_ATTACK_STATE, 
-	# 左右移動攻擊狀態 (對應 ACTION_SIDE_MOVE_ATTACK)
 	SIDE_MOVE_ATTACK_STATE,
-	# 新增：重新佈局狀態
-	REPOSITION_STATE 
 }
+
+# 攻擊節奏狀態
+enum AttackRhythm { IDLE, PREPARING, ATTACKING, RECOVERING }
 #endregion
 
-#region 預載入獨立場景
+#region 導出屬性
+@export_group("衍生物場景")
 @export var water_splash_scene: PackedScene
 @export var wave_scene: PackedScene
 @export var bubble_scene: PackedScene
 
-@onready var collision_shape_node: CollisionShape2D = $CollisionShape2D
-#endregion
-
-#region 巨魚特有屬性
-@export_group("Giant Fish Behavior - Jump Attack")
+@export_group("Giant Fish Behavior")
 @export var dive_duration: float = 1.0
 @export var submerged_move_speed: float = 300.0
 @export var submerged_move_timeout: float = 5.0
 @export var emerge_jump_initial_y_velocity: float = -700.0
-@export var emerge_jump_horizontal_speed: float = 150.0 
-@export var emerge_jump_gravity_scale: float = 0.2
-@export var emerge_jump_max_air_time: float = 3.0 
-@export var emerge_jump_apex_hold_duration: float = 0.35
-@export var emerge_jump_apex_gravity_scale: float = 0.1
-
-@export_group("Giant Fish Behavior - Other Attacks")
+@export var emerge_jump_horizontal_speed: float = 150.0
 @export var tail_swipe_duration: float = 1.5
 @export var bubble_attack_duration: float = 1.0
+@export var charge_speed_multiplier: float = 3.0
+
+@export_group("攻擊節奏配置")
+@export var idle_time_min: float = 1.0
+@export var idle_time_max: float = 2.5
+@export var recovery_time: float = 1.5
 @export var bubbles_per_attack_phase1: int = 5
 @export var bubbles_per_attack_phase2: int = 7
-@export var charge_speed_multiplier: float = 3.0
-@export var reposition_speed_multiplier: float = 1.5 # 新增：重新佈局時的移動速度
+#endregion
 
-@export_group("Giant Fish Behavior - Phase Transition")
-@export var phase_transition_duration: float = 2.0 
-
-@export_group("Mercy Mechanism")
-@export var mercy_period: float = 10.0
-@export var max_aggression_reduction_factor: float = 0.7
+#region 節點引用
+@onready var collision_shape_node: CollisionShape2D = $CollisionShape2D
+@onready var spawnable_manager: SpawnableManager
+@onready var bubble_field_controller: BubbleFieldController
 #endregion
 
 #region 狀態變量
+# 核心狀態
 var is_phase_two: bool = false
-var damage_dealt_in_mercy_period: float = 0.0
-var mercy_period_timer: float = 0.0
-var current_aggression_factor: float = 1.0
+var last_action: String = ""
 
+# 攻擊節奏系統
+var rhythm_state: AttackRhythm = AttackRhythm.IDLE
+var rhythm_timer: float = 0.0
+
+# AI決策系統
+var last_action_times: Dictionary = {}
+
+# 跳躍攻擊相關
 var submerged_move_target_position: Vector2
 var submerged_move_current_timer: float = 0.0
 var _dive_state_timer: float = 0.0
-var _bubble_attack_state_timer: float = 0.0
 var _emerge_jump_air_timer: float = 0.0
 var _is_at_jump_apex: bool = false
 var _jump_apex_hold_timer: float = 0.0
 var _previous_jump_velocity_y: float = 0.0
-var _tail_swipe_state_timer: float = 0.0
-var _phase_transition_timer: float = 0.0
-var _reposition_duration: float = 0.0 # 新增：重新佈局計時器
 
+# 側身攻擊相關
 var half_body_move_direction: int = 1
 var half_body_moves_done: int = 0
-var action_has_spawned_bubbles_in_phase2: bool = false
-
-# 新增: 用於回歸中心邏輯的變數
 var _map_edge_left_x: float = INF 
 var _map_edge_right_x: float = -INF
 var _map_width_calculated: bool = false
 var _is_returning_to_center: bool = false
 var _return_target_x: float = 0.0
 
-# 權重系統變數
-var available_actions: Array[Dictionary] = []
-var last_action_execution_times: Dictionary = {}
-var last_action_name: String = "" # 新增：記錄上一個執行的動作
+# 其他攻擊計時器
+var _tail_swipe_state_timer: float = 0.0
+var _bubble_attack_state_timer: float = 0.0
+var _phase_transition_timer: float = 0.0
+
 var initial_max_health: float = 0.0
-var consecutive_idle_count: int = 0
-const MAX_CONSECUTIVE_IDLE: int = 2
-
-# 新增一個旗標，用於判斷是否在受傷後應該立即反擊
-var is_counter_attack_pending: bool = false
-
-# 連招系統變數
-var is_in_combo: bool = false
-var combo_library: Dictionary = {}
-var current_combo: Array = []
-var current_combo_action_index: int = 0
-const COMBO_START_CHANCE: float = 0.4 # 40% 的機率在待機時嘗試發動連招
 #endregion
-
 
 func _ready() -> void:
 	super._ready()
+
+	# 初始化衍生物管理器
+	spawnable_manager = SpawnableManager.new()
+	add_child(spawnable_manager)
+	
+	# 初始化泡泡場地控制系統
+	bubble_field_controller = BubbleFieldController.new()
+	add_child(bubble_field_controller)
+	bubble_field_controller.bubble_scene = bubble_scene
+	bubble_field_controller.cooldown_time = 8.0
+	bubble_field_controller.trigger_distance = 400.0
+	
+	# 初始化基本變量
 	initial_max_health = max_health
-	can_be_interrupted = false
-	current_state = GiantFishState.APPEAR 
-	mercy_period_timer = mercy_period
-	_gfb_initialize_available_actions()
-	_gfb_initialize_combo_library()
+	current_state = GiantFishState.APPEAR
+	
+	# 設置階段攻擊
+	_setup_phase_attacks()
+	
+	# 初始化攻擊冷卻
+	_initialize_attack_cooldowns()
 	
 	if attack_cooldown_timer:
-		attack_cooldown_timer.wait_time = self.attack_cooldown 
-		attack_cooldown_timer.timeout.connect(_on_idle_finished_and_decide_next_action)
-
-	var current_time_init = Time.get_ticks_msec() / 1000.0
-	for action_config in available_actions:
-		var action_name = action_config.get("name")
-		if action_name and action_name != ACTION_IDLE: 
-			last_action_execution_times[action_name] = current_time_init - action_config.get("min_interval", 100.0) - 1.0
-
+		attack_cooldown_timer.wait_time = 0.5  # 更短的決策間隔
+		attack_cooldown_timer.timeout.connect(_on_rhythm_timer_timeout)
+	
+	# 延遲初始化場地控制系統（等待target_player可用）
+	call_deferred("_initialize_field_controller")
+	
+	# 設置共用碰撞形狀系統
+	_setup_shared_collision_shapes()
 
 func _physics_process(delta: float) -> void:
 	if current_state == GiantFishState.DEFEATED:
 		return
 
 	super._physics_process(delta)
+	
+	# 階段轉換是最高優先級狀態，完全不可被打斷
+	if current_state == GiantFishState.PHASE_TRANSITION:
+		_giant_fish_phase_transition_state(delta)
+		return  # 跳過所有其他處理
+	
+	# 處理攻擊節奏（僅在非階段轉換時）
+	_process_attack_rhythm(delta)
 
-	_update_mercy_mechanism(delta)
-
+	# 處理狀態邏輯
 	match current_state:
 		GiantFishState.IDLE:
 			_process_idle_state(delta)
@@ -162,220 +187,391 @@ func _physics_process(delta: float) -> void:
 			_giant_fish_tail_swipe_state(delta) 
 		GiantFishState.BUBBLE_ATTACK_STATE:
 			_giant_fish_bubble_attack_state(delta)
-		GiantFishState.PHASE_TRANSITION:
-			_giant_fish_phase_transition_state(delta)
-		GiantFishState.REPOSITION_STATE:
-			_giant_fish_reposition_state(delta)
-		GiantFishState.APPEAR, GiantFishState.MOVE, GiantFishState.HURT:
-			# Let superclass handle or add specific logic if any
-			pass # Assuming super._physics_process handles the logic for these states if not overridden by specific _giant_fish_..._state_logic
+		# PHASE_TRANSITION 已在 _physics_process 開頭處理，具有最高優先級
 
+#region 核心AI決策系統 - 簡化版本
+func _setup_phase_attacks():
+	# 第一階段：基礎攻擊（無跳躍攻擊）
+	phase_attacks[1] = [
+		ACTION_TAIL_SWIPE_ATTACK,
+		ACTION_BUBBLE_ATTACK,
+		ACTION_SIDE_MOVE_ATTACK
+	]
+	
+	# 第二階段：全攻擊（包含跳躍攻擊）
+	phase_attacks[2] = [
+		ACTION_TAIL_SWIPE_ATTACK,
+		ACTION_BUBBLE_ATTACK,
+		ACTION_SIDE_MOVE_ATTACK,
+		ACTION_JUMP_ATTACK
+	]
 
-#region 狀態處理函式
-func _process_idle_state(delta: float) -> void:
-	velocity.x = move_toward(velocity.x, 0, deceleration * delta)
-	if not is_on_floor():
-		velocity.y += gravity * delta
+func _initialize_attack_cooldowns():
+	var current_time = Time.get_ticks_msec() / 1000.0
+	
+	for action in ATTACK_COOLDOWNS.keys():
+		# 初始化為可立即使用
+		last_action_times[action] = current_time - ATTACK_COOLDOWNS[action] - 1.0
 
-func _on_idle_finished_and_decide_next_action() -> void:
-	if current_state == GiantFishState.IDLE:
-		_gfb_calculate_and_select_next_action()
-
-
-func _giant_fish_side_move_attack_state(_delta: float):
-	var current_charge_speed = move_speed * charge_speed_multiplier
-
-	if _is_returning_to_center:
-		velocity.x = half_body_move_direction * current_charge_speed
-		if ( (half_body_move_direction > 0 and global_position.x >= _return_target_x) or
-			 (half_body_move_direction < 0 and global_position.x <= _return_target_x) or
-			 abs(global_position.x - _return_target_x) < 15.0 ):
-			_gfb_on_action_finished()
-			return
-	elif is_on_wall():
-		var current_hit_x = global_position.x
+func _initialize_field_controller():
+	"""初始化場地控制系統"""
+	if bubble_field_controller and target_player and spawnable_manager:
+		bubble_field_controller.initialize(self, target_player, spawnable_manager)
 		
-		if half_body_move_direction < 0: # 向左撞牆
-			_map_edge_left_x = current_hit_x
-		else: # 向右撞牆
-			_map_edge_right_x = current_hit_x
+		# 連接信號
+		bubble_field_controller.field_control_triggered.connect(_on_field_control_triggered)
+		bubble_field_controller.field_control_completed.connect(_on_field_control_completed)
+	else:
+		print_debug("[Giant Fish] 場地控制系統初始化失敗 - 組件未就緒")
+		# 重試初始化
+		call_deferred("_initialize_field_controller")
 
-		if _map_edge_left_x != INF and _map_edge_right_x != -INF and _map_edge_left_x < _map_edge_right_x:
-			_map_width_calculated = true
-
-
-		velocity.x = 0 
-		half_body_moves_done += 1
-
-		var max_moves = 2 
-		if is_phase_two:
-			max_moves = 4 
-
-		if is_phase_two and not action_has_spawned_bubbles_in_phase2:
-			_spawn_bubbles_for_action()
-			action_has_spawned_bubbles_in_phase2 = true
+func select_next_action() -> String:
+	var available = []
+	var current_time = Time.get_ticks_msec() / 1000.0
+	var phase_number = 2 if is_phase_two else 1
+	
+	# 簡單條件檢查：驗證冷卻時間和場景資源
+	for action in phase_attacks[phase_number]:
+		var last_time = last_action_times.get(action, 0.0)
+		var cooldown = ATTACK_COOLDOWNS.get(action, 3.0)
 		
-		if half_body_moves_done >= max_moves:
-			_is_returning_to_center = true
+		# 檢查冷卻時間
+		if current_time - last_time < cooldown:
+			continue
 			
-			if _map_width_calculated:
-				var map_width = _map_edge_right_x - _map_edge_left_x
-				var center_x = _map_edge_left_x + map_width / 2.0
-				var offset_range = map_width * 0.25
-				
-				var target_min_x: float
-				var target_max_x: float
-				
-				var new_direction_of_return = -half_body_move_direction # Direction BOSS will move for returning
-				
-				if new_direction_of_return > 0: # Returning towards RIGHT
-					if current_phase == 1:
-						# Phase 1, returning RIGHT: Target in RIGHT half of random zone
-						target_min_x = center_x + 0.01 
-						target_max_x = center_x + offset_range
-					else: # current_phase == 2
-						# Phase 2, returning RIGHT: Target in LEFT half of random zone
-						target_min_x = center_x - offset_range
-						target_max_x = center_x - 0.01
-				else: # new_direction_of_return < 0: Returning towards LEFT
-					if current_phase == 1:
-						# Phase 1, returning LEFT: Target in LEFT half of random zone
-						target_min_x = center_x - offset_range
-						target_max_x = center_x - 0.01
-					else: # current_phase == 2
-						# Phase 2, returning LEFT: Target in RIGHT half of random zone
-						target_min_x = center_x + 0.01
-						target_max_x = center_x + offset_range
-						
-				_return_target_x = randf_range(target_min_x, target_max_x)
-			else:
-				if target_player and is_instance_valid(target_player):
-					_return_target_x = global_position.x + sign(target_player.global_position.x - global_position.x) * (move_speed * 0.5) # Move a bit towards player
-				else:
-					_return_target_x = global_position.x + (-half_body_move_direction * (move_speed * 0.5)) 
-
-			half_body_move_direction *= -1 # Reverse direction to move towards _return_target_x
-			if animated_sprite: animated_sprite.flip_h = half_body_move_direction < 0
-			action_has_spawned_bubbles_in_phase2 = false
-			return 
-		else:
-			half_body_move_direction *= -1
-			if animated_sprite: animated_sprite.flip_h = half_body_move_direction < 0
-			action_has_spawned_bubbles_in_phase2 = false
-
-	if not _is_returning_to_center:
-		velocity.x = half_body_move_direction * current_charge_speed
-
-
-func _giant_fish_dive_state(_delta: float):
-	_dive_state_timer += _delta
-	if _dive_state_timer >= dive_duration:
-		_change_state(GiantFishState.SUBMERGED_MOVE)
-
-
-func _giant_fish_submerged_move_state(delta: float):
-	if target_player:
-		# Potentially re-evaluate target if player moves significantly, for now stick to the initial target.
-		pass
+		# 檢查必需的場景資源
+		var can_execute = true
+		match action:
+			ACTION_BUBBLE_ATTACK:
+				can_execute = bubble_scene != null
+			ACTION_JUMP_ATTACK:
+				can_execute = water_splash_scene != null
+			# 其他攻擊暫時不需要特殊資源檢查
+		
+		if can_execute:
+			available.append(action)
 	
-	global_position = global_position.move_toward(submerged_move_target_position, submerged_move_speed * delta)
-	submerged_move_current_timer += delta
-
-	var dist_to_target = global_position.distance_to(submerged_move_target_position)
-
-	if dist_to_target < 10.0 or submerged_move_current_timer >= submerged_move_timeout:
-		_prepare_emerge_jump()
-
-
-func _giant_fish_emerge_jump_state(delta: float):
-	_emerge_jump_air_timer += delta
-
-	var current_gravity_scale = emerge_jump_gravity_scale
-
-	# Apex detection and hold logic
-	var was_rising = _previous_jump_velocity_y < -1.0 # Check if it was clearly rising
-	var is_now_falling_or_still = velocity.y >= -1.0    # Check if it has started to fall or is near/at apex
-
-	if not _is_at_jump_apex and was_rising and is_now_falling_or_still:
-		_is_at_jump_apex = true
-		_jump_apex_hold_timer = 0.0
-
-	if _is_at_jump_apex:
-		_jump_apex_hold_timer += delta
-		if _jump_apex_hold_timer < emerge_jump_apex_hold_duration:
-			current_gravity_scale = emerge_jump_apex_gravity_scale
-		else:
-			_is_at_jump_apex = false # End apex hold
-
-	# Apply gravity based on the determined scale
-	velocity.y += gravity * current_gravity_scale * delta
+	# 保底機制：確保總有可用攻擊
+	if available.is_empty():
+		available = [ACTION_TAIL_SWIPE_ATTACK]  # 基本攻擊
+		print_debug("[Giant Fish AI] 無可用攻擊，使用保底攻擊（檢查場景資源配置）")
 	
-	# Update previous velocity for next frame's apex detection
-	_previous_jump_velocity_y = velocity.y
+	# 防重複邏輯：避免連續兩次相同攻擊
+	if last_action in available and available.size() > 1:
+		available.erase(last_action)
+	
+	# 距離驅動優化：簡單的距離偏好
+	if target_player and is_instance_valid(target_player):
+		var distance = global_position.distance_to(target_player.global_position)
+		available = _apply_distance_preference(available, distance)
+	
+	# 隨機選擇
+	var selected = available[randi() % available.size()]
+	
+	# 記錄選擇
+	last_action = selected
+	last_action_times[selected] = current_time
+	
+	print_debug("[Giant Fish AI] 選擇攻擊: %s (可用: %s)" % [selected, available])
+	
+	return selected
 
-	# Check for landing or timeout
-	if is_on_floor():
-		velocity.x = 0 
-		_is_at_jump_apex = false
-		_gfb_on_action_finished()
-		return
-	elif _emerge_jump_air_timer >= emerge_jump_max_air_time:
-		velocity.x = 0 
-		velocity.y = 0 
-		_is_at_jump_apex = false
-		_gfb_on_action_finished()
-		return
-
-func _giant_fish_tail_swipe_state(delta: float):
-	_tail_swipe_state_timer += delta
-	if _tail_swipe_state_timer >= tail_swipe_duration:
-		_gfb_on_action_finished()
-
-
-func _giant_fish_bubble_attack_state(delta: float):
-	_bubble_attack_state_timer += delta
-	if _bubble_attack_state_timer >= bubble_attack_duration:
-		_gfb_on_action_finished()
-
-func _giant_fish_phase_transition_state(delta: float):
-	_phase_transition_timer += delta
-	# 在這裡可以加入無敵、特效等邏輯
-	if _phase_transition_timer >= phase_transition_duration:
-		# 階段轉換演出結束，正式開始P2的連招
-		print_debug("[GiantFish AI] Phase transition duration finished. Starting 'PhaseTransitionOpener' combo.")
-		_start_combo("PhaseTransitionOpener")
-
-func _giant_fish_reposition_state(_delta: float) -> void:
-	# (此為預留空位，邏輯將在後續步驟中填充)
-	pass
+func _apply_distance_preference(available_actions: Array, distance: float) -> Array:
+	# 如果只有一個選項，直接返回
+	if available_actions.size() <= 1:
+		return available_actions
+	
+	var preferred = []
+	
+	# 近距離偏好
+	if distance < CLOSE_RANGE_DISTANCE:
+		for action in available_actions:
+			if action == ACTION_TAIL_SWIPE_ATTACK:
+				preferred.append(action)
+	
+	# 遠距離偏好
+	elif distance > FAR_RANGE_DISTANCE:
+		for action in available_actions:
+			if action in [ACTION_JUMP_ATTACK, ACTION_BUBBLE_ATTACK]:
+				preferred.append(action)
+	
+	# 如果有偏好選項，返回偏好；否則返回原列表
+	return preferred if not preferred.is_empty() else available_actions
 #endregion
 
-#region 攻擊準備/執行函式
-func _prepare_jump_attack():
-	if not target_player: 
+#region 攻擊節奏系統
+func _process_attack_rhythm(delta: float):
+	rhythm_timer -= delta
+	
+	match rhythm_state:
+		AttackRhythm.IDLE:
+			# 發呆期：玩家安全攻擊時機
+			velocity.x = move_toward(velocity.x, 0, deceleration * delta)
+			if rhythm_timer <= 0 and current_state == GiantFishState.IDLE:
+				_start_attack_preparation()
+				
+		AttackRhythm.PREPARING:
+			# 準備期：攻擊預告，玩家反應時間
+			if rhythm_timer <= 0:
+				_execute_current_attack()
+				
+		AttackRhythm.ATTACKING:
+			# 攻擊期：危險期，玩家需躲避
+			# 具體攻擊邏輯在各自的狀態處理函數中
+			pass
+				
+		AttackRhythm.RECOVERING:
+			# 恢復期：短暫安全期，玩家反擊機會
+			if rhythm_timer <= 0:
+				_return_to_idle()
+
+func _start_attack_preparation():
+	if rhythm_state != AttackRhythm.IDLE:
 		return
-	submerged_move_target_position = Vector2(target_player.global_position.x, global_position.y)
+		
+	var selected_attack = select_next_action()
+	current_attack = selected_attack
+	rhythm_state = AttackRhythm.PREPARING
+	rhythm_timer = PREPARE_TIMES.get(selected_attack, 1.0)
+	
+	print_debug("[Giant Fish] 開始準備攻擊: %s" % selected_attack)
+	
+	# 播放準備動畫（前搖）
+	_play_prepare_animation(selected_attack)
+
+func _execute_current_attack():
+	rhythm_state = AttackRhythm.ATTACKING
+	
+	print_debug("[Giant Fish] 執行攻擊: %s" % current_attack)
+	
+	# 根據攻擊類型執行相應邏輯
+	match current_attack:
+		ACTION_TAIL_SWIPE_ATTACK:
+			_prepare_tail_swipe_attack()
+		ACTION_BUBBLE_ATTACK:
+			_prepare_bubble_attack()
+		ACTION_SIDE_MOVE_ATTACK:
+			_prepare_half_body_move()
+		ACTION_JUMP_ATTACK:
+			_prepare_jump_attack()
+		_:
+			print_debug("[Giant Fish] 未知攻擊類型: %s" % current_attack)
+			_enter_recovery()
+
+func _enter_recovery():
+	if rhythm_state == AttackRhythm.RECOVERING:
+		return  # 防止重複進入恢復期
+		
+	rhythm_state = AttackRhythm.RECOVERING
+	rhythm_timer = recovery_time
+	_change_state(GiantFishState.IDLE)  # 確保狀態回到IDLE
+	print_debug("[Giant Fish] 進入恢復期")
+
+func _return_to_idle():
+	rhythm_state = AttackRhythm.IDLE
+	rhythm_timer = randf_range(idle_time_min, idle_time_max)
+	_change_state(GiantFishState.IDLE)
+	print_debug("[Giant Fish] 返回待機狀態，發呆時間: %.1f秒" % rhythm_timer)
+
+func _on_rhythm_timer_timeout():
+	# 這個函數現在主要用於確保節奏系統不會卡住
+	if rhythm_state == AttackRhythm.IDLE and current_state == GiantFishState.IDLE:
+		if rhythm_timer <= 0:
+			_start_attack_preparation()
+
+func _play_prepare_animation(attack_name: String):
+	# 播放攻擊準備動畫（前搖）
+	# 不再播放準備動畫，讓狀態變更時的動畫系統處理
+	print_debug("[Giant Fish] 攻擊準備：%s" % attack_name)
+#endregion
+
+#region 水花系統 - 精確實現
+func spawn_water_splashes_emerge(spawn_point: Vector2):
+	"""出水效果：較窄角度的向上噴濺"""
+	_spawn_water_splash_pattern(spawn_point, "emerge")
+
+func spawn_water_splashes_land(spawn_point: Vector2):
+	"""入水效果：較寬角度的向外擴散"""
+	_spawn_water_splash_pattern(spawn_point, "land")
+
+func _spawn_water_splash_pattern(spawn_point: Vector2, effect_type: String):
+	# 使用WaterSplashSpawnPoint節點位置
+	var spawn_point_node = get_node_or_null("WaterSplashSpawnPoint")
+	var center_pos = spawn_point
+	if spawn_point_node:
+		center_pos = spawn_point_node.global_position
+	
+	# 階段差異：二階段跳躍水花每邊+1顆（總共+2顆）
+	var base_splash_count = bubbles_per_attack_phase2 if is_phase_two else bubbles_per_attack_phase1
+	var splash_count = base_splash_count
+	if is_phase_two:
+		splash_count += 2  # 每邊+1顆，總共+2顆
+		print_debug("[Giant Fish] 二階段水花加強：%d -> %d 顆" % [base_splash_count, splash_count])
+	
+	# 根據效果類型設置不同參數
+	var angle_range: float
+	var base_speed: float
+	var vertical_speed: float
+	
+	match effect_type:
+		"emerge":  # 出水：窄角度，強向上
+			angle_range = 80.0  # -40°到+40°
+			base_speed = 250.0
+			vertical_speed = -400.0
+		"land":    # 入水：寬角度，向外擴散
+			angle_range = 140.0  # -70°到+70°
+			base_speed = 350.0
+			vertical_speed = -300.0
+		_:
+			angle_range = 120.0
+			base_speed = 300.0
+			vertical_speed = -350.0
+	
+	var start_angle = -angle_range / 2.0
+	var angle_step = angle_range / (splash_count - 1) if splash_count > 1 else 0.0
+	
+	print_debug("[Giant Fish] 生成%s水花，角度範圍: %.1f°" % [effect_type, angle_range])
+	
+	for i in range(splash_count):
+		# 計算發射角度（度）
+		var angle_deg = start_angle + i * angle_step
+		var angle_rad = deg_to_rad(angle_deg)
+		
+		# 計算初始速度向量
+		var horizontal_speed = base_speed * sin(angle_rad)
+		var initial_velocity = Vector2(horizontal_speed, vertical_speed)
+		
+		# 在世界空間生成水花（使用場景樹根節點，避免跟隨BOSS移動）
+		_spawn_independent_water_splash(center_pos, initial_velocity)
+
+func _spawn_independent_water_splash(world_position: Vector2, initial_velocity: Vector2):
+	"""在世界空間獨立生成水花，不跟隨BOSS移動"""
+	if not water_splash_scene:
+		return
+		
+	var splash = water_splash_scene.instantiate()
+	if not splash:
+		return
+	
+	# 添加到場景樹的根節點而非BOSS，確保獨立物理
+	get_tree().current_scene.add_child(splash)
+	splash.global_position = world_position
+	
+	# 設置視覺與碰撞分離的碰撞層
+	_setup_independent_water_splash(splash, initial_velocity)
+
+func _setup_independent_water_splash(splash: Node, initial_velocity: Vector2):
+	"""設置獨立水花"""
+	if not is_instance_valid(splash):
+		return
+	
+	# 發射水花
+	if splash.has_method("launch"):
+		splash.launch(initial_velocity)
+		print_debug("[Giant Fish] 獨立水花已發射，速度: %s" % initial_velocity)
+	else:
+		print_debug("[Giant Fish] 水花缺少 launch 方法")
+
+# 保留舊函數以兼容 spawnable_manager
+func _setup_water_splash(splash: Node, splash_position: Vector2, initial_velocity: Vector2):
+	if not is_instance_valid(splash):
+		return
+		
+	splash.global_position = splash_position
+	_setup_independent_water_splash(splash, initial_velocity)
+#endregion
+
+#region 攻擊準備函數
+func _prepare_jump_attack():
+	if not target_player or not water_splash_scene: 
+		print_debug("[Giant Fish] 跳躍攻擊條件不滿足，跳過攻擊")
+		_enter_recovery()
+		return
+	
+	# 二階段新增：遠距離跳躍模式
+	var use_long_range_jump = is_phase_two and randf() < 0.5  # 50%機率使用遠距離跳躍
+	
+	if use_long_range_jump:
+		# 遠距離跳躍：移動到地圖邊緣，然後跳向玩家
+		var player_x = target_player.global_position.x
+		var boss_x = global_position.x
+		
+		# 根據地圖邊界或預設距離確定遠距離位置
+		var far_distance = 400.0  # 遠距離跳躍距離
+		var target_x: float
+		
+		if player_x > boss_x:
+			# 玩家在右側，BOSS移動到左遠方
+			target_x = boss_x - far_distance
+		else:
+			# 玩家在左側，BOSS移動到右遠方
+			target_x = boss_x + far_distance
+		
+		submerged_move_target_position = Vector2(target_x, global_position.y)
+		print_debug("[Giant Fish] 遠距離跳躍模式：移動到 %.1f，然後跳向玩家 %.1f" % [target_x, player_x])
+	else:
+		# 標準跳躍：移動到玩家腳下起跳
+		submerged_move_target_position = Vector2(target_player.global_position.x, global_position.y)
+		print_debug("[Giant Fish] 標準跳躍模式：移動到玩家腳下 %.1f" % target_player.global_position.x)
+		
 	submerged_move_current_timer = 0.0
 	_dive_state_timer = 0.0
-	action_has_spawned_bubbles_in_phase2 = false
 	_change_state(GiantFishState.DIVE)
 
 func _prepare_tail_swipe_attack():
-	action_has_spawned_bubbles_in_phase2 = false
 	_tail_swipe_state_timer = 0.0
 	_change_state(GiantFishState.TAIL_SWIPE)
 
 func _prepare_bubble_attack():
+	if not bubble_scene:
+		print_debug("[Giant Fish] 泡泡場景未設置，跳過泡泡攻擊")
+		_enter_recovery()
+		return
+	
+	# 檢查是否使用場地控制模式
+	var use_field_control = _should_use_field_control()
+	
+	if use_field_control and bubble_field_controller:
+		print_debug("[Giant Fish] 使用場地控制模式")
+		var pattern = bubble_field_controller.select_field_control_pattern()
+		if pattern != "" and bubble_field_controller.trigger_field_control(pattern):
+			# 場地控制已觸發，直接進入恢復期
+			_enter_recovery()
+			return
+	
+	# 使用普通扇形泡泡攻擊
+	print_debug("[Giant Fish] 使用普通泡泡攻擊")
 	_spawn_bubbles_for_action()
 	_bubble_attack_state_timer = 0.0
 	_change_state(GiantFishState.BUBBLE_ATTACK_STATE)
 
-func _prepare_reposition() -> void:
-	# (此為預留空位，邏輯將在後續步驟中填充)
-	pass
-
-func _prepare_idle():
-	_change_state(GiantFishState.IDLE)
+func _should_use_field_control() -> bool:
+	"""決定是否使用場地控制模式"""
+	if not bubble_field_controller or bubble_field_controller.is_cooldown:
+		return false
+	
+	if not target_player:
+		return false
+	
+	var distance = global_position.distance_to(target_player.global_position)
+	
+	# 條件1：玩家距離過遠時優先使用場地控制
+	if distance > 500.0:
+		return true
+	
+	# 條件2：二階段時更頻繁使用場地控制
+	var base_chance = 0.3 if is_phase_two else 0.2
+	
+	# 條件3：根據攻擊次數增加使用概率
+	var attack_count = bubble_field_controller.trigger_count
+	var bonus_chance = min(attack_count * 0.1, 0.3)
+	
+	var final_chance = base_chance + bonus_chance
+	var use_field_control = randf() < final_chance
+	
+	
+	return use_field_control
 
 func _prepare_half_body_move():
 	half_body_moves_done = 0
@@ -391,513 +587,192 @@ func _prepare_half_body_move():
 	else:
 		half_body_move_direction = 1 if randf() > 0.5 else -1
 	
-	action_has_spawned_bubbles_in_phase2 = false
-	_change_state(GiantFishState.SIDE_MOVE_ATTACK_STATE) 
-
-func _prepare_emerge_jump():
-	action_has_spawned_bubbles_in_phase2 = false
-
-	if target_player and is_instance_valid(target_player):
-		var direction_to_player = (target_player.global_position - global_position).normalized()
-		velocity.x = direction_to_player.x * emerge_jump_horizontal_speed
-		velocity.y = emerge_jump_initial_y_velocity 
-	else:
-		velocity.x = 0
-		velocity.y = emerge_jump_initial_y_velocity
-
-	_emerge_jump_air_timer = 0.0
-	_is_at_jump_apex = false
-	_previous_jump_velocity_y = emerge_jump_initial_y_velocity
-	_change_state(GiantFishState.EMERGE_JUMP)
-
+	_change_state(GiantFishState.SIDE_MOVE_ATTACK_STATE)
 #endregion
 
-#region 連招系統核心函式 (新)
-func _gfb_initialize_combo_library() -> void:
-	# 定義 BOSS 的所有連招組合
-	# 鍵 (Key) 是連招的名稱，值 (Value) 是一個包含動作常量的陣列
-	
-	# 連招 A: 壓迫與突襲 (將玩家逼到角落後，發動突襲)
-	combo_library["PressureCombo"] = {
-		"actions": [ACTION_SIDE_MOVE_ATTACK, ACTION_JUMP_ATTACK],
-		"condition": func(): return _is_player_in_corner()
-	}
-	
-	# 連招 B: 近身作戰 (結合近距離的甩尾和遠程的泡泡)
-	combo_library["CloseQuartersCombo"] = {
-		"actions": [ACTION_TAIL_SWIPE_ATTACK, ACTION_BUBBLE_ATTACK],
-		"condition": func(): return _is_player_close(250.0)
-	}
-	
-	# 連招 C: 階段轉換專用 (一個更具威脅性的組合，作為 P2 的開場)
-	combo_library["PhaseTransitionOpener"] = {
-		"actions": [ACTION_JUMP_ATTACK, ACTION_TAIL_SWIPE_ATTACK],
-		"condition": func(): return true # P2開場必定執行，無特殊條件
-	}
-	
-	print_debug("[ComboSystem] Combo library initialized with %d combos." % combo_library.size())
 
-
-func _start_combo(combo_name: String) -> void:
-	if not combo_library.has(combo_name):
-		printerr("[ComboSystem] Attempted to start non-existent combo: ", combo_name)
-		_change_state(GiantFishState.IDLE)
-		return
-	
-	print_debug("[ComboSystem] Starting combo: ", combo_name)
-	is_in_combo = true
-	current_combo = combo_library[combo_name]["actions"]
-	current_combo_action_index = 0
-	_execute_next_combo_action()
-
-func _execute_next_combo_action() -> void:
-	if not is_in_combo or current_combo_action_index >= current_combo.size():
-		_end_combo()
-		return
-
-	var next_action_name = current_combo[current_combo_action_index]
-	print_debug("[ComboSystem] Executing combo action %d: %s" % [current_combo_action_index + 1, next_action_name])
-	
-	current_combo_action_index += 1
-	_prepare_action_by_state(next_action_name)
-
-func _end_combo() -> void:
-	if not is_in_combo:
-		return
-	
-	print_debug("[ComboSystem] Combo finished.")
-	is_in_combo = false
-	current_combo = []
-	current_combo_action_index = 0
-	_change_state(GiantFishState.IDLE) # 連招結束後返回待機
-
-func _gfb_on_action_finished() -> void:
-	"""
-	一個動作（如揮尾、衝刺）完成後被呼叫。
-	用來決定是繼續連招的下一步，還是轉換到待機狀態。
-	"""
-	if is_in_combo:
-		_execute_next_combo_action()
-	else:
-		_change_state(GiantFishState.IDLE)
-#endregion
-
-#region 水花、波浪、泡泡的產生函式
-func _spawn_water_splashes_at_point(point: Vector2, direction_is_left: bool):
-	if not water_splash_scene:
-		push_error("Water Splash Scene not set!")
-		return
-
-	var splash_count = 5 if is_phase_two else 3
-
-	for i in range(splash_count):
-		var splash = water_splash_scene.instantiate()
-		get_tree().current_scene.add_child(splash)
-		splash.global_position = point
-		var horizontal_velocity_magnitude = (i + 1) * 50.0
-		var launch_angle_degrees = 60.0 # Example: high arc
-		var launch_angle_radians = deg_to_rad(launch_angle_degrees)
-		
-		var dir_x = -1.0 if direction_is_left else 1.0
-		# For splashes going to both sides, you'd alternate dir_x or have two loops/calls
-		# Assuming 'direction_is_left' means the *group* of splashes goes left or right from a central point.
-		# If it means the fish is facing left and splashes go opposite, adjust dir_x.
-		# For simplicity, let's assume splashes spread: half left, half right relative to 'point'
-		# This part needs clarification based on desired effect. The ORIGINAL_README was more detailed.
-		# Reverting to a simpler model where 'direction_is_left' determines the general direction from the point
-		
-		# Let's assume the WaterSplash scene itself has logic to move based on some initial velocity property
-		if splash.has_method("launch"):
-			var velocity_vector = Vector2(cos(launch_angle_radians) * horizontal_velocity_magnitude * dir_x, 
-										  -sin(launch_angle_radians) * horizontal_velocity_magnitude)
-			splash.launch(velocity_vector)
-		else:
-			push_warning("WaterSplash scene is missing a 'launch' method.")
-
-
-func _spawn_wave():
-	if not wave_scene:
-		push_error("Wave Scene not set!")
-		return
-
-
+#region 泡泡生成
 func _spawn_bubbles_for_action():
+	print_debug("[Giant Fish] 開始扇形泡泡攻擊")
+	
 	if not bubble_scene:
-		push_error("Bubble Scene not set!")
+		print_debug("[Giant Fish] 泡泡場景未設置")
+		return
+
+	if not spawnable_manager:
+		print_debug("[Giant Fish] SpawnableManager 未初始化")
 		return
 
 	var bubble_count = bubbles_per_attack_phase2 if is_phase_two else bubbles_per_attack_phase1
 	
-	var spawn_point_node = $BubbleSpawnPoint
+	# 獲取生成點位置
+	var spawn_point_node = get_node_or_null("BubbleSpawnPoint")
 	var spawn_pos = global_position
 	if spawn_point_node:
 		spawn_pos = spawn_point_node.global_position
+	else:
+		spawn_pos = global_position + Vector2(0, -50)
 
+	# 扇形參數設置
+	var angle_range = 120.0  # 總角度範圍
+	var start_angle = -angle_range / 2.0
+	var angle_step = angle_range / (bubble_count - 1) if bubble_count > 1 else 0.0
+	
+	# 確保BOSS面向玩家
+	_face_target()
+	
+	print_debug("[Giant Fish] 扇形角度範圍: %.1f°，間隔: %.1f°" % [angle_range, angle_step])
+
+	# 0.1秒間隔連續生成泡泡，模擬吹泡泡效果
 	for i in range(bubble_count):
-		var bubble = bubble_scene.instantiate()
-		get_tree().current_scene.add_child(bubble)
-		bubble.global_position = spawn_pos
-		if bubble.has_method("initialize_bubble"):
-			bubble.initialize_bubble()
-
-#endregion
-
-#region 輔助函式 (新)
-
-func _is_player_in_corner(corner_threshold_percent: float = 0.2) -> bool:
-	"""檢查玩家是否被逼到地圖角落。"""
-	if not is_instance_valid(target_player) or not _map_width_calculated:
-		return false
-	
-	var map_width = _map_edge_right_x - _map_edge_left_x
-	if map_width <= 0: return false
-	
-	var corner_threshold_pixels = map_width * corner_threshold_percent
-	var player_x = target_player.global_position.x
-	
-	return player_x < _map_edge_left_x + corner_threshold_pixels or \
-		   player_x > _map_edge_right_x - corner_threshold_pixels
-
-
-func _is_player_close(distance: float) -> bool:
-	"""檢查玩家與 BOSS 的距離是否小於指定值。"""
-	if not is_instance_valid(target_player):
-		return false
-	return global_position.distance_to(target_player.global_position) <= distance
-
-
-func _get_player_context() -> Dictionary:
-	"""
-	收集關於玩家的即時戰術資訊，供 AI 決策系統使用。
-	這是為了解決 AI 權重計算系統無法獲取玩家資訊的潛在錯誤。
-	"""
-	if not is_instance_valid(target_player):
-		return {"is_valid": false}
+		var angle_deg = start_angle + i * angle_step
+		var direction = Vector2(cos(deg_to_rad(angle_deg)), sin(deg_to_rad(angle_deg)))
 		
-	var distance = global_position.distance_to(target_player.global_position)
-	
-	# 定義與 AI 邏輯一致的距離閾值
-	var close_threshold = 300.0
-	var far_threshold = 600.0
-	
-	var context = {
-		"is_valid": true,
-		"distance": distance,
-		"is_close": distance <= close_threshold,
-		"is_far": distance >= far_threshold,
-		"is_in_corner": _is_player_in_corner(),
-		"position": target_player.global_position
-	}
-	return context
-#endregion
-
-#region 仁慈機制與階段轉換
-func _update_mercy_mechanism(delta: float):
-	mercy_period_timer -= delta
-	if mercy_period_timer <= 0:
-		mercy_period_timer = mercy_period
-		if damage_dealt_in_mercy_period == 0:
-			current_aggression_factor = maxf(current_aggression_factor * 0.8, max_aggression_reduction_factor)
-		else:
-			current_aggression_factor = 1.0
+		print_debug("[Giant Fish] 生成第 %d 個泡泡，角度: %.1f°" % [i + 1, angle_deg])
 		
-		damage_dealt_in_mercy_period = 0
-
-
-func take_damage(damage: float, attacker: Node, _knockback_info: Dictionary = {}) -> void:
-	# 恢復對 super.take_damage 的呼叫，以修復打斷和血條信號問題
-	# 並且只傳遞父類別需要的參數
-	super.take_damage(damage, attacker)
+		# 在世界空間獨立生成泡泡，不跟隨BOSS
+		_spawn_independent_bubble(spawn_pos, direction)
+		
+		# 0.1秒間隔，模擬吹泡泡的連續效果
+		if i < bubble_count - 1:  # 最後一個泡泡不需要等待
+			await get_tree().create_timer(0.1).timeout
 	
-	if current_health <= 0:
-		return
+	print_debug("[Giant Fish] 扇形泡泡攻擊完成")
 
-	damage_dealt_in_mercy_period += damage
+func _setup_bubble_with_direction(bubble: Node, spawn_pos: Vector2, direction: Vector2):
+	"""設置帶方向的泡泡（用於扇形攻擊）"""
+	print_debug("[Giant Fish] 設置扇形泡泡，方向: %s" % direction)
 	
-	if current_health <= max_health / 2 and not is_phase_two:
-		if current_state != GiantFishState.PHASE_TRANSITION:
-			print_debug("[Phase] Health below threshold. Triggering Phase Transition.")
-			_change_state(GiantFishState.PHASE_TRANSITION)
-
-#endregion
-
-#region 狀態改變
-func _reset_state_specific_variables() -> void:
-	# 重置計時器
-	_dive_state_timer = 0.0
-	_bubble_attack_state_timer = 0.0
-	_tail_swipe_state_timer = 0.0
-	submerged_move_current_timer = 0.0
-	_emerge_jump_air_timer = 0.0
-	_jump_apex_hold_timer = 0.0
-	
-	# 重置旗標和計數器
-	_is_at_jump_apex = false
-	_is_returning_to_center = false
-	half_body_moves_done = 0
-	action_has_spawned_bubbles_in_phase2 = false
-
-	# 重置其他變數
-	_previous_jump_velocity_y = 0.0
-
-func _change_state(new_state: int) -> void:
-	if current_state == new_state:
+	if not is_instance_valid(bubble):
+		print_debug("[Giant Fish] 泡泡對象無效")
 		return
 		
-	# 最終修復：使用 .find_key() 來安全、正確地獲取 enum 的名稱
-	var old_state_name = GiantFishState.find_key(current_state)
-	if old_state_name == null: old_state_name = "UNKNOWN (%d)" % current_state
+	bubble.global_position = spawn_pos
 	
-	var new_state_name = GiantFishState.find_key(new_state)
-	if new_state_name == null: new_state_name = "UNKNOWN (%d)" % new_state
-
-	print("[GiantFish AI] State Change: %s -> %s" % [old_state_name, new_state_name])
-
-	# 核心修復：只在父類別認識該狀態時才呼叫 super._change_state
-	# 這樣可以防止父類別處理它不認識的子類別狀態，從而避免狀態混亂
-	if new_state in BossBase.BossState.values():
-		super._change_state(new_state)
+	# 嘗試設置初始方向（如果泡泡支持）
+	if bubble.has_method("initialize_with_direction"):
+		bubble.initialize_with_direction(target_player, direction)
+	elif bubble.has_method("initialize"):
+		bubble.initialize(target_player)
 	else:
-		# 如果是子類別特有的狀態，則手動在子類別中設定
-		previous_state = current_state
-		current_state = new_state
+		print_debug("[Giant Fish] 泡泡缺少 initialize 方法")
 
-	self._reset_state_specific_variables()
+func _setup_bubble(bubble: Node, spawn_pos: Vector2):
+	"""設置標準泡泡（向後兼容）"""
+	print_debug("[Giant Fish] 設置標準泡泡: %s" % bubble)
 	
-	match new_state:
-		GiantFishState.IDLE:
-			velocity = Vector2.ZERO
-			if attack_cooldown_timer and attack_cooldown_timer.is_stopped():
-				attack_cooldown_timer.start()
-			# 核心修復：確保每次返回待機狀態時，都重置無敵狀態，使其變為可受傷
-			vulnerable = true
-			is_invincible = false
-			can_be_interrupted = true
-				
-		GiantFishState.DIVE:
-			velocity = Vector2.ZERO
-			
-		GiantFishState.DEFEATED:
-			_on_defeated()
-			
-		GiantFishState.PHASE_TRANSITION:
-			is_phase_two = true
-			current_phase = 2
-			_phase_transition_timer = 0.0
-			can_be_interrupted = false
-			
-			# 動態設定轉場時間，使其與動畫長度同步
-			if animated_sprite and animated_sprite.sprite_frames.has_animation("phase_transition"):
-				# 修正：使用正確的公式（總幀數 / 播放速度）來計算動畫總時長
-				var frame_count = animated_sprite.sprite_frames.get_frame_count("phase_transition")
-				var speed = animated_sprite.sprite_frames.get_animation_speed("phase_transition")
-				if speed > 0:
-					self.phase_transition_duration = frame_count / speed
-					print_debug("[GiantFish AI] Phase transition duration dynamically set to animation length: %.2f sec" % self.phase_transition_duration)
-				else:
-					printerr("'phase_transition' animation speed is 0. Falling back to default duration.")
-			else:
-				# 如果真的找不到動畫，使用預設值以防崩潰
-				printerr("Could not find 'phase_transition' animation. Falling back to default duration.")
-			
-		GiantFishState.SIDE_MOVE_ATTACK_STATE:
-			can_be_interrupted = false
-			
-		GiantFishState.EMERGE_JUMP:
-			can_be_interrupted = true
-			
-	var animation_name = get_current_animation_name()
-	if animation_name and animated_sprite.sprite_frames.has_animation(animation_name):
-		animated_sprite.play(animation_name)
-	elif animation_name:
-		printerr("Animation not found for state %s (tried '%s')" % [GiantFishState.keys()[GiantFishState.values().find(new_state)], animation_name])
+	if not is_instance_valid(bubble):
+		print_debug("[Giant Fish] 泡泡對象無效")
+		return
+		
+	bubble.global_position = spawn_pos
+	print_debug("[Giant Fish] 泡泡位置設定: %s" % spawn_pos)
+	
+	# 泡泡場景應該有自己的腳本來處理行為
+	if bubble.has_method("initialize"):
+		bubble.initialize(target_player)
+	else:
+		print_debug("[Giant Fish] 泡泡缺少 initialize 方法")
+	
+	print_debug("[Giant Fish] 泡泡設置完成")
 
+func _spawn_independent_bubble(world_position: Vector2, direction: Vector2):
+	"""在世界空間獨立生成泡泡，不跟隨BOSS移動"""
+	if not bubble_scene:
+		return
+		
+	var bubble = bubble_scene.instantiate()
+	if not bubble:
+		return
+	
+	# 添加到場景樹的根節點而非BOSS，確保獨立物理
+	get_tree().current_scene.add_child(bubble)
+	bubble.global_position = world_position
+	
+	# 設置泡泡運動方向和參數
+	_setup_independent_bubble(bubble, direction)
+
+func _setup_independent_bubble(bubble: Node, direction: Vector2):
+	"""設置獨立泡泡"""
+	if not is_instance_valid(bubble):
+		return
+	
+	# 使用新的方向初始化函數
+	if bubble.has_method("initialize_with_direction"):
+		bubble.initialize_with_direction(target_player, direction)
+	elif bubble.has_method("initialize"):
+		bubble.initialize(target_player)
+	else:
+		print_debug("[Giant Fish] 泡泡缺少初始化方法")
+
+func _face_target():
+	"""確保BOSS面向玩家"""
+	if target_player and is_instance_valid(target_player) and animated_sprite:
+		var direction_to_player = target_player.global_position.x - global_position.x
+		animated_sprite.flip_h = direction_to_player < 0
+		print_debug("[Giant Fish] BOSS面向玩家，flip_h: %s" % animated_sprite.flip_h)
 #endregion
 
-#region Boss特有邏輯的覆寫或擴展
-func _on_defeated():
-	set_physics_process(false)
-	if collision_shape_node:
-		collision_shape_node.disabled = true
-	if hitbox:
-		hitbox.monitoring = false
-		hitbox.monitorable = false
-	velocity = Vector2.ZERO
-	if animated_sprite and animated_sprite.sprite_frames.has_animation("defeat"):
-		animated_sprite.play("defeat")
-		await animated_sprite.animation_finished
-	else:
-		await get_tree().create_timer(1.0).timeout 
+#region 波浪系統
+func _spawn_waves_after_tail_swipe():
+	# 開始生成波浪
 	
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager and game_manager.has_method("on_boss_defeated"):
-		game_manager.on_boss_defeated(self.name)
-	
-	queue_free()
+	if not wave_scene:
+		# 波浪場景未設置
+		return
 
+	if not spawnable_manager:
+		print_debug("[Giant Fish] SpawnableManager 未初始化")
+		return
+
+	# 生成單個波浪，方向跟隨BOSS攻擊朝向
+	var direction = Vector2.RIGHT if not animated_sprite or not animated_sprite.flip_h else Vector2.LEFT
+	
+	# 使用WaveSpawnPoint節點位置，如果沒有則使用BOSS位置
+	var spawn_point_node = get_node_or_null("WaveSpawnPoint")
+	var spawn_pos = global_position
+	if spawn_point_node:
+		spawn_pos = spawn_point_node.global_position
+	
+	spawnable_manager.spawn_with_pool(
+		wave_scene, 
+		"wave",
+		func(obj): _setup_wave(obj, spawn_pos, direction, true)
+	)
+	
+	# 二階段才有第二波波浪
+	if is_phase_two:
+		# 0.5秒後生成第二波原始大小波浪
+		await get_tree().create_timer(0.5).timeout
+		spawnable_manager.spawn_with_pool(
+			wave_scene, 
+			"wave",
+			func(obj): _setup_wave(obj, spawn_pos, direction, false)
+		)
+	
+
+func _setup_wave(wave: Node, spawn_pos: Vector2, direction: Vector2, is_first_wave: bool = true):
+	if not is_instance_valid(wave):
+		return
+		
+	wave.global_position = spawn_pos
+	
+	var wave_scale: float
+	if is_first_wave:
+		wave_scale = 1.7 if is_phase_two else 1.0
+	else:
+		wave_scale = 1.0
+	
+	if wave.has_method("set_scale_multiplier"):
+		wave.set_scale_multiplier(wave_scale)
+	else:
+		wave.scale = Vector2(wave_scale, wave_scale)  # 如果波浪不支持倍數設置，直接設置scale
+	
+	if wave.has_method("initialize"):
+		wave.initialize(direction)
 #endregion
 
-#region 行動選擇與權重計算 (重要邏輯)
-
-func _gfb_initialize_available_actions() -> void: 
-	available_actions = [
-		{"name": ACTION_IDLE, 			"function_name": "_prepare_idle", 			"weight": 0.1, "min_cooldown": 0.5, "is_utility": true},
-		{"name": ACTION_REPOSITION, 	"function_name": "_prepare_reposition", 	"weight": 0.5, "min_cooldown": 6.0, "is_utility": true},
-		{"name": ACTION_SIDE_MOVE_ATTACK, "function_name": "_prepare_half_body_move", 	"weight": 1.0, "min_cooldown": 8.0, "tags": ["aggressive"]},
-		{"name": ACTION_JUMP_ATTACK, 		"function_name": "_prepare_jump_attack", 		"weight": 1.0, "min_cooldown": 10.0, "tags": ["aggressive", "far_range"]},
-		{"name": ACTION_TAIL_SWIPE_ATTACK, "function_name": "_prepare_tail_swipe_attack", "weight": 1.0, "min_cooldown": 6.0, "tags": ["close_range"]},
-		{"name": ACTION_BUBBLE_ATTACK, 	"function_name": "_prepare_bubble_attack", 	"weight": 0.8, "min_cooldown": 5.0, "tags": []}
-	]
-	
-	# 初始化 last_action_execution_times，確保所有動作在遊戲開始時都可以立即執行（如果條件允許）
-	var current_time = Time.get_ticks_msec() / 1000.0
-	for action_config in available_actions:
-		var action_name = action_config.get("name")
-		if action_name: # 確保 action_name 存在
-			last_action_execution_times[action_name] = current_time - action_config.get("min_cooldown", 100.0) - 1.0 # 減去一個較大的間隔以允許首次執行
-
-
-func _gfb_calculate_and_select_next_action() -> void:
-	if current_state != GiantFishState.IDLE and not is_counter_attack_pending:
-		return
-
-	if is_in_combo:
-		# 如果正在執行連招，則不應由計時器觸發新的獨立動作決策
-		print_debug("[GiantFish AI] In combo, skipping normal action selection.")
-		return
-
-	var player_context = _get_player_context()
-
-	# --- 策略性連招決策 ---
-	var potential_combos = []
-	for combo_name in combo_library.keys():
-		var combo_info = combo_library[combo_name]
-		if combo_info.get("condition", func(): return false).call():
-			potential_combos.append(combo_name)
-	
-	if not potential_combos.is_empty():
-		var selected_combo = potential_combos[randi() % potential_combos.size()]
-		# 檢查連招的第一個動作是否可用
-		var first_action_name = combo_library[selected_combo]["actions"][0]
-		var current_time = Time.get_ticks_msec() / 1000.0
-		var last_time = last_action_execution_times.get(first_action_name, 0.0)
-		var config = available_actions.filter(func(a): return a.name == first_action_name)[0]
-		
-		if current_time - last_time >= config.get("min_cooldown", 0.0):
-			print_debug("[GiantFish AI] Condition met for combo: %s. Starting." % selected_combo)
-			_start_combo(selected_combo)
-			return
-
-	# --- 單一行動決策邏輯 ---
-	var action_scores: Dictionary = {}
-	var total_score: float = 0.0
-	var debug_strings: Array[String] = []
-	var current_time = Time.get_ticks_msec() / 1000.0
-
-	for action_config in available_actions:
-		var action_name = action_config.get("name")
-		var score = float(action_config.get("weight", 0.0))
-		var reason = "Base:%.2f" % score
-
-		# 1. 硬性條件過濾 (冷卻)
-		var min_cooldown = action_config.get("min_cooldown", 0.0)
-		var time_since_last = current_time - last_action_execution_times.get(action_name, -999.0)
-		if time_since_last < min_cooldown:
-			continue
-
-		# 2. 動態權重調整
-		# A. 柔性冷卻 & 最近使用懲罰
-		if last_action_name == action_name:
-			score *= 0.25 # 大幅降低剛用過的招式的權重
-			reason += "*0.25(LastUsed)"
-		else:
-			# 剛脫離冷卻期的招式，權重較低，隨時間線性恢復
-			var time_over_cooldown = time_since_last - min_cooldown
-			var recovery_factor = clamp(time_over_cooldown / 5.0, 0.3, 1.0) # 5秒內恢復到100%權重
-			score *= recovery_factor
-			reason += "*%.2f(CooldownRecovery)" % recovery_factor
-
-		# B. 基於血量的攻擊性
-		var health_percent = current_health / initial_max_health
-		if health_percent < 0.5 and action_config.get("tags", []).has("aggressive"):
-			score *= 1.5 # 血量低於50%，攻擊性招式權重增加
-			reason += "*1.5(LowHealth)"
-		
-		# C. 根據玩家距離
-		if player_context.is_valid:
-			if player_context.is_close and action_config.get("tags", []).has("close_range"):
-				score *= 2.0; reason += "*2.0(PlayerClose)"
-			if player_context.is_far and action_config.get("tags", []).has("far_range"):
-				score *= 2.0; reason += "*2.0(PlayerFar)"
-		
-		# D. 避免連續待機
-		if consecutive_idle_count >= 1 and action_config.get("is_utility", false):
-			score *= 0.1 # 如果上次是待機，大幅降低工具性招式（包括待機）的權重
-			reason += "*0.1(AvoidIdle)"
-
-		action_scores[action_name] = score
-		total_score += score
-		debug_strings.append("- '%s' score: %.2f (%s)" % [action_name, score, reason])
-
-	# ... (與之前類似的選擇邏輯)
-	if total_score <= 0:
-		_prepare_action_by_state(ACTION_IDLE) # 如果沒招可用，就待機
-		return
-
-	var random_value = randf() * total_score
-	var cumulative_score: float = 0.0
-	var selected_action: String = ""
-
-	for action_name in action_scores.keys():
-		cumulative_score += action_scores[action_name]
-		if random_value <= cumulative_score:
-			selected_action = action_name
-			break
-	
-	if selected_action.is_empty(): selected_action = action_scores.keys()[0]
-
-	print("\n[GiantFish AI] --- Action Decision ---")
-	print("Player Context: " + str(player_context))
-	for s in debug_strings: print(s)
-	print("=> Selected Action: %s" % selected_action)
-
-	if selected_action == ACTION_IDLE:
-		consecutive_idle_count += 1
-	else:
-		consecutive_idle_count = 0
-
-	last_action_name = selected_action # 記錄本次執行的動作
-	_prepare_action_by_state(selected_action)
-
-
-func _prepare_action_by_state(action_name: String) -> void:
-	last_action_execution_times[action_name] = Time.get_ticks_msec() / 1000.0
-	match action_name:
-		ACTION_IDLE:
-			_prepare_idle()
-		ACTION_REPOSITION:
-			_prepare_reposition()
-		ACTION_SIDE_MOVE_ATTACK:
-			_prepare_half_body_move()
-		ACTION_JUMP_ATTACK:
-			_prepare_jump_attack()
-		ACTION_TAIL_SWIPE_ATTACK:
-			_prepare_tail_swipe_attack()
-		ACTION_BUBBLE_ATTACK:
-			_prepare_bubble_attack()
-		_:
-			printerr("[GFB _prepare_action] Error: Unknown action '%s'" % action_name)
-			_change_state(GiantFishState.IDLE)
-
-
-func _is_state_an_attack(state: int) -> bool:
-	return state in [
-		GiantFishState.EMERGE_JUMP,
-		GiantFishState.TAIL_SWIPE,
-		GiantFishState.BUBBLE_ATTACK_STATE,
-		GiantFishState.REPOSITION_STATE
-	] or super._is_state_an_attack(state)
-
+#region 動畫映射
 func get_current_animation_name() -> String:
 	match current_state:
 		GiantFishState.TAIL_SWIPE:
@@ -913,10 +788,315 @@ func get_current_animation_name() -> String:
 		GiantFishState.EMERGE_JUMP:
 			return "emerge_jump"
 		GiantFishState.PHASE_TRANSITION:
-			# 修正為正確的動畫名稱
 			return "phase_transition"
-		GiantFishState.REPOSITION_STATE:
-			return "move" 
 		_:
 			return super.get_current_animation_name()
+#endregion
+
+#region 狀態處理函數（保留原有邏輯）
+func _process_idle_state(delta: float) -> void:
+	# 基礎追擊邏輯
+	if target_player and is_instance_valid(target_player):
+		var distance_to_player = global_position.distance_to(target_player.global_position)
+		var direction_to_player = (target_player.global_position - global_position).normalized()
+		
+		# 面向玩家
+		if animated_sprite:
+			animated_sprite.flip_h = direction_to_player.x < 0
+		
+		# 在合理距離內緩慢追擊
+		if distance_to_player > 100.0:  # 保持一定距離
+			velocity.x = move_toward(velocity.x, direction_to_player.x * move_speed * 0.3, acceleration * delta)
+		else:
+			velocity.x = move_toward(velocity.x, 0, deceleration * delta)
+	else:
+		velocity.x = move_toward(velocity.x, 0, deceleration * delta)
+	
+	# 重力
+	if not is_on_floor():
+		velocity.y += gravity * delta
+
+func _giant_fish_side_move_attack_state(_delta: float):
+	var current_charge_speed = move_speed * charge_speed_multiplier
+
+	if _is_returning_to_center:
+		velocity.x = half_body_move_direction * current_charge_speed
+		if ( (half_body_move_direction > 0 and global_position.x >= _return_target_x) or
+			 (half_body_move_direction < 0 and global_position.x <= _return_target_x) or
+			 abs(global_position.x - _return_target_x) < 15.0 ):
+			_on_action_finished()
+			return
+	elif is_on_wall():
+		var current_hit_x = global_position.x
+		
+		if half_body_move_direction < 0:
+			_map_edge_left_x = current_hit_x
+		else:
+			_map_edge_right_x = current_hit_x
+
+		if _map_edge_left_x != INF and _map_edge_right_x != -INF and _map_edge_left_x < _map_edge_right_x:
+			_map_width_calculated = true
+
+		velocity.x = 0 
+		half_body_moves_done += 1
+
+		var max_moves = 2 
+		if is_phase_two:
+			max_moves = 4 
+		
+		if half_body_moves_done >= max_moves:
+			_is_returning_to_center = true
+			
+			if _map_width_calculated:
+				var map_width = _map_edge_right_x - _map_edge_left_x
+				var center_x = _map_edge_left_x + map_width / 2.0
+				var offset_range = map_width * 0.25
+				
+				var new_direction_of_return = -half_body_move_direction
+				
+				if new_direction_of_return > 0:
+					if not is_phase_two:
+						_return_target_x = randf_range(center_x + 0.01, center_x + offset_range)
+					else:
+						_return_target_x = randf_range(center_x - offset_range, center_x - 0.01)
+				else:
+					if not is_phase_two:
+						_return_target_x = randf_range(center_x - offset_range, center_x - 0.01)
+					else:
+						_return_target_x = randf_range(center_x + 0.01, center_x + offset_range)
+			else:
+				if target_player and is_instance_valid(target_player):
+					_return_target_x = global_position.x + sign(target_player.global_position.x - global_position.x) * (move_speed * 0.5)
+				else:
+					_return_target_x = global_position.x + (-half_body_move_direction * (move_speed * 0.5))
+
+			half_body_move_direction *= -1
+			if animated_sprite: 
+				animated_sprite.flip_h = half_body_move_direction < 0
+			return 
+		else:
+			half_body_move_direction *= -1
+			if animated_sprite: 
+				animated_sprite.flip_h = half_body_move_direction < 0
+
+	if not _is_returning_to_center:
+		velocity.x = half_body_move_direction * current_charge_speed
+
+func _giant_fish_dive_state(_delta: float):
+	_dive_state_timer += _delta
+	if _dive_state_timer >= dive_duration:
+		_change_state(GiantFishState.SUBMERGED_MOVE)
+
+func _giant_fish_submerged_move_state(delta: float):
+	global_position = global_position.move_toward(submerged_move_target_position, submerged_move_speed * delta)
+	submerged_move_current_timer += delta
+
+	var dist_to_target = global_position.distance_to(submerged_move_target_position)
+
+	if dist_to_target < 10.0 or submerged_move_current_timer >= submerged_move_timeout:
+		_prepare_emerge_jump()
+
+func _prepare_emerge_jump():
+	if target_player and is_instance_valid(target_player):
+		var direction_to_player = (target_player.global_position - global_position).normalized()
+		velocity.x = direction_to_player.x * emerge_jump_horizontal_speed
+		velocity.y = emerge_jump_initial_y_velocity 
+	else:
+		velocity.x = 0
+		velocity.y = emerge_jump_initial_y_velocity
+
+	# 出水時生成第一次水花
+	print_debug("[Giant Fish] 出水起跳，生成出水效果")
+	spawn_water_splashes_emerge(global_position)
+
+	_emerge_jump_air_timer = 0.0
+	_is_at_jump_apex = false
+	_previous_jump_velocity_y = emerge_jump_initial_y_velocity
+	_change_state(GiantFishState.EMERGE_JUMP)
+
+func _giant_fish_emerge_jump_state(delta: float):
+	_emerge_jump_air_timer += delta
+
+	var current_gravity_scale = 0.2
+	var was_rising = _previous_jump_velocity_y < -1.0
+	var is_now_falling_or_still = velocity.y >= -1.0
+
+	if not _is_at_jump_apex and was_rising and is_now_falling_or_still:
+		_is_at_jump_apex = true
+		_jump_apex_hold_timer = 0.0
+
+	if _is_at_jump_apex:
+		_jump_apex_hold_timer += delta
+		if _jump_apex_hold_timer < 0.35:
+			current_gravity_scale = 0.1
+		else:
+			_is_at_jump_apex = false
+
+	velocity.y += gravity * current_gravity_scale * delta
+	_previous_jump_velocity_y = velocity.y
+
+	if is_on_floor():
+		# 落地時生成第二次水花
+		print_debug("[Giant Fish] 落地入水，生成入水效果")
+		spawn_water_splashes_land(global_position)
+		
+		velocity.x = 0 
+		_is_at_jump_apex = false
+		_on_action_finished()
+		return
+	elif _emerge_jump_air_timer >= 3.0:
+		velocity.x = 0 
+		velocity.y = 0 
+		_is_at_jump_apex = false
+		_on_action_finished()
+		return
+
+func _giant_fish_tail_swipe_state(delta: float):
+	_tail_swipe_state_timer += delta
+	if _tail_swipe_state_timer >= tail_swipe_duration:
+		# 擺尾攻擊結束時生成波浪
+		# 擺尾結束，生成波浪
+		_spawn_waves_after_tail_swipe()
+		_on_action_finished()
+
+func _giant_fish_bubble_attack_state(delta: float):
+	_bubble_attack_state_timer += delta
+	if _bubble_attack_state_timer >= bubble_attack_duration:
+		_on_action_finished()
+
+func _giant_fish_phase_transition_state(delta: float):
+	_phase_transition_timer += delta
+	if _phase_transition_timer >= 2.0:
+		_on_action_finished()
+
+func _on_action_finished():
+	# 防止重複調用
+	if rhythm_state == AttackRhythm.RECOVERING:
+		return
+		
+	print_debug("[Giant Fish] 攻擊完成，進入恢復期")
+	_enter_recovery()
+
+func _setup_shared_collision_shapes():
+	"""設置共用碰撞形狀系統 - 讓 Hitbox 和 TouchDamageArea 共用相同形狀"""
+	var main_collision = get_node_or_null("CollisionShape2D")
+	if not main_collision:
+		print_debug("[Giant Fish] 找不到主碰撞形狀")
+		return
+	
+	var main_shape = main_collision.shape
+	if not main_shape:
+		print_debug("[Giant Fish] 主碰撞形狀為空")
+		return
+	
+	# 設置 Hitbox 共用相同形狀
+	var hitbox_collision = get_node_or_null("Hitbox/CollisionShape2D")
+	if hitbox_collision:
+		hitbox_collision.shape = main_shape
+		print_debug("[Giant Fish] Hitbox 碰撞形狀已共用")
+	
+	# 設置 TouchDamageArea 共用相同形狀
+	var touch_damage_collision = get_node_or_null("TouchDamageArea/CollisionShape2D")
+	if touch_damage_collision:
+		touch_damage_collision.shape = main_shape
+		print_debug("[Giant Fish] TouchDamageArea 碰撞形狀已共用")
+	
+	print_debug("[Giant Fish] 碰撞形狀共用設置完成")
+
+func _on_field_control_triggered(pattern_name: String):
+	"""場地控制觸發回調"""
+	print_debug("[Giant Fish] 場地控制已觸發: %s" % pattern_name)
+
+func _on_field_control_completed(pattern_name: String):
+	"""場地控制完成回調"""
+	print_debug("[Giant Fish] 場地控制已完成: %s" % pattern_name)
+#endregion
+
+#region 狀態變更
+func _change_state(new_state: int) -> void:
+	if current_state == new_state:
+		return
+		
+	var old_state_name = GiantFishState.find_key(current_state)
+	if old_state_name == null: 
+		old_state_name = "UNKNOWN (%d)" % current_state
+	
+	var new_state_name = GiantFishState.find_key(new_state)
+	if new_state_name == null: 
+		new_state_name = "UNKNOWN (%d)" % new_state
+
+	print_debug("[Giant Fish] 狀態變更: %s -> %s" % [old_state_name, new_state_name])
+
+	if new_state in BossBase.BossState.values():
+		super._change_state(new_state)
+	else:
+		previous_state = current_state
+		current_state = new_state
+
+	match new_state:
+		GiantFishState.IDLE:
+			velocity = Vector2.ZERO
+			vulnerable = true
+			is_invincible = false
+			can_be_interrupted = true
+				
+		GiantFishState.DIVE:
+			velocity = Vector2.ZERO
+			
+		GiantFishState.DEFEATED:
+			_on_defeated()
+			
+		GiantFishState.PHASE_TRANSITION:
+			is_phase_two = true
+			current_phase = 2
+			_phase_transition_timer = 0.0
+			can_be_interrupted = false
+			# 完全重置攻擊節奏系統，確保不會被打斷
+			rhythm_state = AttackRhythm.IDLE
+			rhythm_timer = 0.0
+			print_debug("[Giant Fish] 階段轉換開始 - 攻擊節奏系統已重置")
+			
+		GiantFishState.SIDE_MOVE_ATTACK_STATE:
+			can_be_interrupted = false
+			
+		GiantFishState.EMERGE_JUMP:
+			can_be_interrupted = true
+#endregion
+
+#region 受傷和階段轉換
+func take_damage(damage: float, attacker: Node, _knockback_info: Dictionary = {}) -> void:
+	super.take_damage(damage, attacker)
+	
+	if current_health <= 0:
+		return
+
+	if current_health <= max_health * PHASE_TWO_HEALTH_THRESHOLD and not is_phase_two:
+		if current_state != GiantFishState.PHASE_TRANSITION:
+			print_debug("[Giant Fish] 血量低於閾值，觸發階段轉換")
+			_change_state(GiantFishState.PHASE_TRANSITION)
+
+func _on_defeated():
+	set_physics_process(false)
+	if collision_shape_node:
+		collision_shape_node.disabled = true
+	if hitbox:
+		hitbox.monitoring = false
+		hitbox.monitorable = false
+	velocity = Vector2.ZERO
+	
+	# 清理所有衍生物
+	if spawnable_manager:
+		spawnable_manager.cleanup_all()
+	
+	if animated_sprite and animated_sprite.sprite_frames.has_animation("defeat"):
+		animated_sprite.play("defeat")
+		await animated_sprite.animation_finished
+	else:
+		await get_tree().create_timer(1.0).timeout 
+	
+	var game_manager = get_tree().get_first_node_in_group("game_manager")
+	if game_manager and game_manager.has_method("on_boss_defeated"):
+		game_manager.on_boss_defeated(self.name)
+	
+	queue_free()
 #endregion

@@ -55,7 +55,7 @@ func _transition_to(new_state: PlayerState) -> void:
 	var _current_state_str = str(current_state.name) if current_state else "None"
 	if not new_state:
 		return
-	if new_state == current_state and not (new_state is state_jump):
+	if new_state == current_state and not (new_state is PlayerJumpState):
 		return
 
 	if current_state:
