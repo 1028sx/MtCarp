@@ -25,3 +25,31 @@ export_presets.cfg
 
 # Claude Code specific
 .claude/
+
+# 開發筆記和計劃
+CLAUDE.md
+*_PLAN.md
+*任務*.md
+開發任務清單.md
+*_REFACTOR*.md
+
+# 備份文件
+backup/
+backups/
+*.backup
+*.bak
+*.tmp
+
+# 知識庫和個人文檔
+knowledge_base/
+
+# 第三方開發工具  
+godot-mcp/
+
+# Cursor IDE specific
+.cursor/
+
+# 臨時和雜項文件
+nul
+**/*.tmp
+Beg*.tmp
