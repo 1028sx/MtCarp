@@ -169,7 +169,6 @@ func _apply_attack_damage() -> void:
 	
 	# 檢查是否被禁錮，如果是則重定向攻擊（使用緩存優化）
 	if player.is_imprisoned and player.imprisoning_source and player._is_imprisoning_source_valid_cached():
-		print_debug("[Attack] 玩家被禁錮，攻擊重定向到泡泡")
 		if player.imprisoning_source.has_method("receive_player_attack"):
 			player.imprisoning_source.receive_player_attack()
 		return

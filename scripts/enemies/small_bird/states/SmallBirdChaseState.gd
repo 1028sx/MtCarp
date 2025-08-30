@@ -25,13 +25,33 @@ func process_physics(delta: float) -> void:
 	# 使用智能追蹤系統
 	var target_position = owner.get_smart_chase_position(owner.player, delta)
 	
-	# 使用新的飛行方法
-	owner.fly_towards_target(target_position, owner.chase_speed, delta)
-
-	# 檢查是否到達攻擊位置（改為檢查到玩家的實際距離）
+	# 添加橫向擺動使追蹤更自然
+	var wave_offset = sin(owner.time_counter * 2.0) * 15.0
+	target_position.x += wave_offset
+	
+	# 根據距離調整追蹤速度
 	var distance_to_player = owner.global_position.distance_to(owner.player.global_position)
-	if distance_to_player < 80 and owner.attack_cooldown_timer.is_stopped():
-		transition_to("Attack")
+	var speed_factor = 1.0
+	
+	# 距離太近時減速，太遠時加速
+	if distance_to_player < 100:
+		speed_factor = 0.7  # 接近時減速
+	elif distance_to_player > 250:
+		speed_factor = 1.2  # 距離遠時加速追趕
+	
+	# 使用調整後的速度飛行
+	owner.fly_towards_target(target_position, owner.chase_speed * speed_factor, delta)
+
+	# 檢查是否到達理想攻擊距離
+	var ideal_attack_distance = 120  # 理想攻擊距離
+	if distance_to_player < ideal_attack_distance and distance_to_player > 60:
+		# 在理想距離範圍內，檢查冷卻
+		if owner.attack_cooldown_timer.is_stopped():
+			transition_to("Attack")
+	elif distance_to_player < 60:
+		# 太近了，後退一點
+		var retreat_direction = (owner.global_position - owner.player.global_position).normalized()
+		owner.velocity += retreat_direction * 50
 
 
 func on_player_lost(_body: Node) -> void:

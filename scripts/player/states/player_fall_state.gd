@@ -10,7 +10,8 @@ extends PlayerState
 @export var air_control_factor: float = 0.8
 
 func enter() -> void:
-	player.animated_sprite.play("jump")
+	# 不重新播放跳躍動畫，讓動畫保持在當前狀態
+	pass
 
 func process_physics(delta: float) -> void:
 

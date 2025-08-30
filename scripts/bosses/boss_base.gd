@@ -479,13 +479,7 @@ func set_touch_damage_active(is_active: bool) -> void:
 	var collision_shape = touch_damage_area.get_node_or_null("CollisionShape2D")
 	if is_instance_valid(collision_shape):
 		collision_shape.disabled = not is_active
-		if debug_mode:
-			print_debug("[BossBase] TouchDamageArea collision " + ("enabled" if is_active else "disabled"))
-	else:
-		# CollisionShape2D 還未創建，這是正常的（會由 CollisionShapeManager 稍後創建）
-		# 靜默處理，避免錯誤信息
-		if debug_mode:
-			print_debug("[BossBase] TouchDamageArea CollisionShape2D 尚未創建，跳過設置")
+		# CollisionShape2D 還未創建時靜默處理（由 CollisionShapeManager 稍後創建）
 
 #endregion
 
@@ -507,23 +501,14 @@ func _on_animation_finished() -> void:
 	if current_state_val_on_finish >= 0 and current_state_val_on_finish < boss_state_count:
 		pass
 	
-	if debug_mode:
-		print_debug("[BossBase] _on_animation_finished called. Animation: '%s', Current State: %s" % [
-			anim_name,
-			BossState.keys()[current_state] if current_state in BossState else "UNKNOWN"
-		])
 
 	# 如果當前狀態的持續時間由子類別手動處理，則直接返回，不做任何操作。
 	if _is_state_duration_handled_manually(current_state):
-		if debug_mode:
-			print_debug("[BossBase] State '%s' is handled manually. Ignoring animation finish." % BossState.keys()[current_state])
 		return
 
 	# 如果是攻擊動畫播放完畢，且該動畫不循環，則返回待機
 	if _is_state_an_attack(current_state):
 		if not animated_sprite.sprite_frames.get_animation_loop(anim_name):
-			if debug_mode:
-				print_debug("[BossBase] Attack animation finished. Changing to IDLE state.")
 			_change_state(BossState.IDLE)
 			return
 			

@@ -24,12 +24,21 @@ const ATTACK_COOLDOWNS = {
 	ACTION_JUMP_ATTACK: 8.0
 }
 
-# 攻擊準備時間
-const PREPARE_TIMES = {
-	ACTION_TAIL_SWIPE_ATTACK: 0.8,
-	ACTION_BUBBLE_ATTACK: 0.6,
-	ACTION_SIDE_MOVE_ATTACK: 1.0,
-	ACTION_JUMP_ATTACK: 1.2
+# 攻擊幀配置
+const ATTACK_FRAMES = {
+	"tail_swipe": {
+		"attack_frame": 4       # 攻擊判定幀（生成波浪）
+	},
+	"bubble_attack": {
+		"attack_frame": 3       # 泡泡發射幀
+	},
+	"move": {  # side_move_attack 對應的動畫名
+		"attack_frame": 6       # 轉向波浪生成幀（衝撞過程中）
+	},
+	"emerge_jump": {
+		"attack_frame": 2,      # 出水特效幀
+		"land_effect_frame": 8  # 落地特效幀
+	}
 }
 #endregion
 
@@ -51,8 +60,6 @@ enum GiantFishState {
 	SIDE_MOVE_ATTACK_STATE,
 }
 
-# 攻擊節奏狀態
-enum AttackRhythm { IDLE, PREPARING, ATTACKING, RECOVERING }
 #endregion
 
 #region 導出屬性
@@ -71,10 +78,9 @@ enum AttackRhythm { IDLE, PREPARING, ATTACKING, RECOVERING }
 @export var bubble_attack_duration: float = 1.0
 @export var charge_speed_multiplier: float = 3.0
 
-@export_group("攻擊節奏配置")
-@export var idle_time_min: float = 1.0
-@export var idle_time_max: float = 2.5
-@export var recovery_time: float = 1.5
+@export_group("攻擊配置")
+@export var attack_interval_min: float = 2.0  # 最小攻擊間隔
+@export var attack_interval_max: float = 3.5  # 最大攻擊間隔
 @export var bubbles_per_attack_phase1: int = 5
 @export var bubbles_per_attack_phase2: int = 7
 #endregion
@@ -90,9 +96,14 @@ enum AttackRhythm { IDLE, PREPARING, ATTACKING, RECOVERING }
 var is_phase_two: bool = false
 var last_action: String = ""
 
-# 攻擊節奏系統
-var rhythm_state: AttackRhythm = AttackRhythm.IDLE
-var rhythm_timer: float = 0.0
+
+# 連擊系統
+var combo_count: int = 0
+var max_combo_count: int = 2  # 第一階段最大2連，第二階段會變成3連
+var combo_chance_phase1: float = 0.35  # 第一階段35%機率連擊
+var combo_chance_phase2: float = 0.50  # 第二階段50%機率連擊
+var is_in_combo: bool = false
+var combo_interval: float = 0.8  # 連擊間隔（比正常恢復時間短）
 
 # AI決策系統
 var last_action_times: Dictionary = {}
@@ -119,6 +130,15 @@ var _return_target_x: float = 0.0
 var _tail_swipe_state_timer: float = 0.0
 var _bubble_attack_state_timer: float = 0.0
 var _phase_transition_timer: float = 0.0
+
+# 攻擊間隔控制
+var _attack_interval_timer: float = 0.0
+var _can_attack: bool = true
+
+# 防重複觸發系統
+var _triggered_effects: Dictionary = {}  # 格式：{動畫名_幀號: true}
+var _last_animation: String = ""
+var _last_state: int = -1
 
 var initial_max_health: float = 0.0
 #endregion
@@ -147,9 +167,9 @@ func _ready() -> void:
 	# 初始化攻擊冷卻
 	_initialize_attack_cooldowns()
 	
-	if attack_cooldown_timer:
-		attack_cooldown_timer.wait_time = 0.5  # 更短的決策間隔
-		attack_cooldown_timer.timeout.connect(_on_rhythm_timer_timeout)
+	# 連接動畫幀變化信號
+	if animated_sprite:
+		animated_sprite.frame_changed.connect(_on_frame_changed)
 	
 	# 延遲初始化場地控制系統（等待target_player可用）
 	call_deferred("_initialize_field_controller")
@@ -168,8 +188,11 @@ func _physics_process(delta: float) -> void:
 		_giant_fish_phase_transition_state(delta)
 		return  # 跳過所有其他處理
 	
-	# 處理攻擊節奏（僅在非階段轉換時）
-	_process_attack_rhythm(delta)
+	# 處理攻擊間隔計時器
+	if _attack_interval_timer > 0:
+		_attack_interval_timer -= delta
+		if _attack_interval_timer <= 0:
+			_can_attack = true
 
 	# 處理狀態邏輯
 	match current_state:
@@ -198,10 +221,9 @@ func _setup_phase_attacks():
 		ACTION_SIDE_MOVE_ATTACK
 	]
 	
-	# 第二階段：全攻擊（包含跳躍攻擊）
+	# 第二階段：移除泡泡攻擊（因為其他攻擊已經有很多泡泡效果），加入跳躍攻擊
 	phase_attacks[2] = [
 		ACTION_TAIL_SWIPE_ATTACK,
-		ACTION_BUBBLE_ATTACK,
 		ACTION_SIDE_MOVE_ATTACK,
 		ACTION_JUMP_ATTACK
 	]
@@ -222,7 +244,6 @@ func _initialize_field_controller():
 		bubble_field_controller.field_control_triggered.connect(_on_field_control_triggered)
 		bubble_field_controller.field_control_completed.connect(_on_field_control_completed)
 	else:
-		print_debug("[Giant Fish] 場地控制系統初始化失敗 - 組件未就緒")
 		# 重試初始化
 		call_deferred("_initialize_field_controller")
 
@@ -255,7 +276,6 @@ func select_next_action() -> String:
 	# 保底機制：確保總有可用攻擊
 	if available.is_empty():
 		available = [ACTION_TAIL_SWIPE_ATTACK]  # 基本攻擊
-		print_debug("[Giant Fish AI] 無可用攻擊，使用保底攻擊（檢查場景資源配置）")
 	
 	# 防重複邏輯：避免連續兩次相同攻擊
 	if last_action in available and available.size() > 1:
@@ -273,7 +293,6 @@ func select_next_action() -> String:
 	last_action = selected
 	last_action_times[selected] = current_time
 	
-	print_debug("[Giant Fish AI] 選擇攻擊: %s (可用: %s)" % [selected, available])
 	
 	return selected
 
@@ -300,90 +319,41 @@ func _apply_distance_preference(available_actions: Array, distance: float) -> Ar
 	return preferred if not preferred.is_empty() else available_actions
 #endregion
 
-#region 攻擊節奏系統
-func _process_attack_rhythm(delta: float):
-	rhythm_timer -= delta
+
+#region 連擊系統
+func _should_trigger_combo() -> bool:
+	"""判斷是否應該觸發連擊"""
+	# 階段轉換狀態不觸發連擊
+	if current_state == GiantFishState.PHASE_TRANSITION:
+		return false
 	
-	match rhythm_state:
-		AttackRhythm.IDLE:
-			# 發呆期：玩家安全攻擊時機
-			velocity.x = move_toward(velocity.x, 0, deceleration * delta)
-			if rhythm_timer <= 0 and current_state == GiantFishState.IDLE:
-				_start_attack_preparation()
-				
-		AttackRhythm.PREPARING:
-			# 準備期：攻擊預告，玩家反應時間
-			if rhythm_timer <= 0:
-				_execute_current_attack()
-				
-		AttackRhythm.ATTACKING:
-			# 攻擊期：危險期，玩家需躲避
-			# 具體攻擊邏輯在各自的狀態處理函數中
-			pass
-				
-		AttackRhythm.RECOVERING:
-			# 恢復期：短暫安全期，玩家反擊機會
-			if rhythm_timer <= 0:
-				_return_to_idle()
-
-func _start_attack_preparation():
-	if rhythm_state != AttackRhythm.IDLE:
-		return
-		
-	var selected_attack = select_next_action()
-	current_attack = selected_attack
-	rhythm_state = AttackRhythm.PREPARING
-	rhythm_timer = PREPARE_TIMES.get(selected_attack, 1.0)
+	# 已達到最大連擊數
+	if combo_count >= max_combo_count:
+		return false
 	
-	print_debug("[Giant Fish] 開始準備攻擊: %s" % selected_attack)
+	# 根據當前階段計算連擊機率
+	var combo_chance = combo_chance_phase2 if is_phase_two else combo_chance_phase1
 	
-	# 播放準備動畫（前搖）
-	_play_prepare_animation(selected_attack)
+	# 隨機判斷是否觸發
+	return randf() < combo_chance
 
-func _execute_current_attack():
-	rhythm_state = AttackRhythm.ATTACKING
+func _trigger_combo():
+	"""觸發連擊"""
+	combo_count += 1
+	is_in_combo = true
 	
-	print_debug("[Giant Fish] 執行攻擊: %s" % current_attack)
+	# 較短的間隔後觸發下一次攻擊
+	_can_attack = false
+	_attack_interval_timer = combo_interval
 	
-	# 根據攻擊類型執行相應邏輯
-	match current_attack:
-		ACTION_TAIL_SWIPE_ATTACK:
-			_prepare_tail_swipe_attack()
-		ACTION_BUBBLE_ATTACK:
-			_prepare_bubble_attack()
-		ACTION_SIDE_MOVE_ATTACK:
-			_prepare_half_body_move()
-		ACTION_JUMP_ATTACK:
-			_prepare_jump_attack()
-		_:
-			print_debug("[Giant Fish] 未知攻擊類型: %s" % current_attack)
-			_enter_recovery()
+	# 等待間隔結束後，_can_attack 會自動設為 true，觸發下一次攻擊
+	
+	
+func _end_combo():
+	"""結束連擊"""
+	combo_count = 0
+	is_in_combo = false
 
-func _enter_recovery():
-	if rhythm_state == AttackRhythm.RECOVERING:
-		return  # 防止重複進入恢復期
-		
-	rhythm_state = AttackRhythm.RECOVERING
-	rhythm_timer = recovery_time
-	_change_state(GiantFishState.IDLE)  # 確保狀態回到IDLE
-	print_debug("[Giant Fish] 進入恢復期")
-
-func _return_to_idle():
-	rhythm_state = AttackRhythm.IDLE
-	rhythm_timer = randf_range(idle_time_min, idle_time_max)
-	_change_state(GiantFishState.IDLE)
-	print_debug("[Giant Fish] 返回待機狀態，發呆時間: %.1f秒" % rhythm_timer)
-
-func _on_rhythm_timer_timeout():
-	# 這個函數現在主要用於確保節奏系統不會卡住
-	if rhythm_state == AttackRhythm.IDLE and current_state == GiantFishState.IDLE:
-		if rhythm_timer <= 0:
-			_start_attack_preparation()
-
-func _play_prepare_animation(attack_name: String):
-	# 播放攻擊準備動畫（前搖）
-	# 不再播放準備動畫，讓狀態變更時的動畫系統處理
-	print_debug("[Giant Fish] 攻擊準備：%s" % attack_name)
 #endregion
 
 #region 水花系統 - 精確實現
@@ -407,7 +377,6 @@ func _spawn_water_splash_pattern(spawn_point: Vector2, effect_type: String):
 	var splash_count = base_splash_count
 	if is_phase_two:
 		splash_count += 2  # 每邊+1顆，總共+2顆
-		print_debug("[Giant Fish] 二階段水花加強：%d -> %d 顆" % [base_splash_count, splash_count])
 	
 	# 根據效果類型設置不同參數
 	var angle_range: float
@@ -431,7 +400,6 @@ func _spawn_water_splash_pattern(spawn_point: Vector2, effect_type: String):
 	var start_angle = -angle_range / 2.0
 	var angle_step = angle_range / (splash_count - 1) if splash_count > 1 else 0.0
 	
-	print_debug("[Giant Fish] 生成%s水花，角度範圍: %.1f°" % [effect_type, angle_range])
 	
 	for i in range(splash_count):
 		# 計算發射角度（度）
@@ -469,9 +437,6 @@ func _setup_independent_water_splash(splash: Node, initial_velocity: Vector2):
 	# 發射水花
 	if splash.has_method("launch"):
 		splash.launch(initial_velocity)
-		print_debug("[Giant Fish] 獨立水花已發射，速度: %s" % initial_velocity)
-	else:
-		print_debug("[Giant Fish] 水花缺少 launch 方法")
 
 # 保留舊函數以兼容 spawnable_manager
 func _setup_water_splash(splash: Node, splash_position: Vector2, initial_velocity: Vector2):
@@ -485,9 +450,12 @@ func _setup_water_splash(splash: Node, splash_position: Vector2, initial_velocit
 #region 攻擊準備函數
 func _prepare_jump_attack():
 	if not target_player or not water_splash_scene: 
-		print_debug("[Giant Fish] 跳躍攻擊條件不滿足，跳過攻擊")
-		_enter_recovery()
+		_change_state(GiantFishState.IDLE)
 		return
+	
+	# 第二階段強化：跳躍前的泡泡預備
+	if is_phase_two:
+		_spawn_jump_prep_bubbles()
 	
 	# 二階段新增：遠距離跳躍模式
 	var use_long_range_jump = is_phase_two and randf() < 0.5  # 50%機率使用遠距離跳躍
@@ -509,11 +477,9 @@ func _prepare_jump_attack():
 			target_x = boss_x + far_distance
 		
 		submerged_move_target_position = Vector2(target_x, global_position.y)
-		print_debug("[Giant Fish] 遠距離跳躍模式：移動到 %.1f，然後跳向玩家 %.1f" % [target_x, player_x])
 	else:
 		# 標準跳躍：移動到玩家腳下起跳
 		submerged_move_target_position = Vector2(target_player.global_position.x, global_position.y)
-		print_debug("[Giant Fish] 標準跳躍模式：移動到玩家腳下 %.1f" % target_player.global_position.x)
 		
 	submerged_move_current_timer = 0.0
 	_dive_state_timer = 0.0
@@ -525,24 +491,20 @@ func _prepare_tail_swipe_attack():
 
 func _prepare_bubble_attack():
 	if not bubble_scene:
-		print_debug("[Giant Fish] 泡泡場景未設置，跳過泡泡攻擊")
-		_enter_recovery()
+		_change_state(GiantFishState.IDLE)
 		return
 	
 	# 檢查是否使用場地控制模式
 	var use_field_control = _should_use_field_control()
 	
 	if use_field_control and bubble_field_controller:
-		print_debug("[Giant Fish] 使用場地控制模式")
 		var pattern = bubble_field_controller.select_field_control_pattern()
 		if pattern != "" and bubble_field_controller.trigger_field_control(pattern):
-			# 場地控制已觸發，直接進入恢復期
-			_enter_recovery()
+			# 場地控制已觸發，直接返回IDLE狀態
+			_change_state(GiantFishState.IDLE)
 			return
 	
-	# 使用普通扇形泡泡攻擊
-	print_debug("[Giant Fish] 使用普通泡泡攻擊")
-	_spawn_bubbles_for_action()
+	# 使用普通扇形泡泡攻擊（現在由動畫幀觸發）
 	_bubble_attack_state_timer = 0.0
 	_change_state(GiantFishState.BUBBLE_ATTACK_STATE)
 
@@ -587,20 +549,21 @@ func _prepare_half_body_move():
 	else:
 		half_body_move_direction = 1 if randf() > 0.5 else -1
 	
+	# 第二階段強化：衝撞前的泡泡預備
+	if is_phase_two:
+		_spawn_charge_prep_bubbles()
+	
 	_change_state(GiantFishState.SIDE_MOVE_ATTACK_STATE)
 #endregion
 
 
 #region 泡泡生成
 func _spawn_bubbles_for_action():
-	print_debug("[Giant Fish] 開始扇形泡泡攻擊")
 	
 	if not bubble_scene:
-		print_debug("[Giant Fish] 泡泡場景未設置")
 		return
 
 	if not spawnable_manager:
-		print_debug("[Giant Fish] SpawnableManager 未初始化")
 		return
 
 	var bubble_count = bubbles_per_attack_phase2 if is_phase_two else bubbles_per_attack_phase1
@@ -621,14 +584,12 @@ func _spawn_bubbles_for_action():
 	# 確保BOSS面向玩家
 	_face_target()
 	
-	print_debug("[Giant Fish] 扇形角度範圍: %.1f°，間隔: %.1f°" % [angle_range, angle_step])
 
 	# 0.1秒間隔連續生成泡泡，模擬吹泡泡效果
 	for i in range(bubble_count):
 		var angle_deg = start_angle + i * angle_step
 		var direction = Vector2(cos(deg_to_rad(angle_deg)), sin(deg_to_rad(angle_deg)))
 		
-		print_debug("[Giant Fish] 生成第 %d 個泡泡，角度: %.1f°" % [i + 1, angle_deg])
 		
 		# 在世界空間獨立生成泡泡，不跟隨BOSS
 		_spawn_independent_bubble(spawn_pos, direction)
@@ -637,14 +598,11 @@ func _spawn_bubbles_for_action():
 		if i < bubble_count - 1:  # 最後一個泡泡不需要等待
 			await get_tree().create_timer(0.1).timeout
 	
-	print_debug("[Giant Fish] 扇形泡泡攻擊完成")
 
 func _setup_bubble_with_direction(bubble: Node, spawn_pos: Vector2, direction: Vector2):
 	"""設置帶方向的泡泡（用於扇形攻擊）"""
-	print_debug("[Giant Fish] 設置扇形泡泡，方向: %s" % direction)
 	
 	if not is_instance_valid(bubble):
-		print_debug("[Giant Fish] 泡泡對象無效")
 		return
 		
 	bubble.global_position = spawn_pos
@@ -654,27 +612,19 @@ func _setup_bubble_with_direction(bubble: Node, spawn_pos: Vector2, direction: V
 		bubble.initialize_with_direction(target_player, direction)
 	elif bubble.has_method("initialize"):
 		bubble.initialize(target_player)
-	else:
-		print_debug("[Giant Fish] 泡泡缺少 initialize 方法")
 
 func _setup_bubble(bubble: Node, spawn_pos: Vector2):
 	"""設置標準泡泡（向後兼容）"""
-	print_debug("[Giant Fish] 設置標準泡泡: %s" % bubble)
 	
 	if not is_instance_valid(bubble):
-		print_debug("[Giant Fish] 泡泡對象無效")
 		return
 		
 	bubble.global_position = spawn_pos
-	print_debug("[Giant Fish] 泡泡位置設定: %s" % spawn_pos)
 	
 	# 泡泡場景應該有自己的腳本來處理行為
 	if bubble.has_method("initialize"):
 		bubble.initialize(target_player)
-	else:
-		print_debug("[Giant Fish] 泡泡缺少 initialize 方法")
 	
-	print_debug("[Giant Fish] 泡泡設置完成")
 
 func _spawn_independent_bubble(world_position: Vector2, direction: Vector2):
 	"""在世界空間獨立生成泡泡，不跟隨BOSS移動"""
@@ -702,15 +652,101 @@ func _setup_independent_bubble(bubble: Node, direction: Vector2):
 		bubble.initialize_with_direction(target_player, direction)
 	elif bubble.has_method("initialize"):
 		bubble.initialize(target_player)
-	else:
-		print_debug("[Giant Fish] 泡泡缺少初始化方法")
 
 func _face_target():
 	"""確保BOSS面向玩家"""
 	if target_player and is_instance_valid(target_player) and animated_sprite:
 		var direction_to_player = target_player.global_position.x - global_position.x
 		animated_sprite.flip_h = direction_to_player < 0
-		print_debug("[Giant Fish] BOSS面向玩家，flip_h: %s" % animated_sprite.flip_h)
+
+func _spawn_charge_prep_bubbles():
+	"""衝撞前預備：發射3個定向泡泡"""
+	if not bubble_scene or not target_player or not is_instance_valid(target_player):
+		return
+	
+	var bubble_count = 3
+	var spawn_point_node = get_node_or_null("BubbleSpawnPoint")
+	var spawn_pos = global_position
+	if spawn_point_node:
+		spawn_pos = spawn_point_node.global_position
+	else:
+		spawn_pos = global_position + Vector2(0, -50)
+	
+	# 面向玩家
+	_face_target()
+	
+	# 計算朝向玩家的方向
+	var direction_to_player = (target_player.global_position - spawn_pos).normalized()
+	
+	# 生成3個泡泡：中間1個直射，左右各1個小角度偏移
+	var angles = [-15.0, 0.0, 15.0]  # 左偏移15度、直射、右偏移15度
+	
+	for i in range(bubble_count):
+		var angle_offset = deg_to_rad(angles[i])
+		var direction = direction_to_player.rotated(angle_offset)
+		
+		# 在世界空間獨立生成泡泡
+		_spawn_independent_bubble(spawn_pos, direction)
+		
+		# 短暫間隔，營造發射效果
+		if i < bubble_count - 1:
+			await get_tree().create_timer(0.1).timeout
+
+func _spawn_jump_prep_bubbles():
+	"""跳躍前預備：向左右散射泡泡"""
+	if not bubble_scene:
+		return
+	
+	var bubble_count = 4  # 左右各2個
+	var spawn_point_node = get_node_or_null("BubbleSpawnPoint")
+	var spawn_pos = global_position
+	if spawn_point_node:
+		spawn_pos = spawn_point_node.global_position
+	else:
+		spawn_pos = global_position + Vector2(0, -50)
+	
+	# 左右散射角度：-45°, -22°, 22°, 45°
+	var angles = [-45.0, -22.0, 22.0, 45.0]
+	
+	for i in range(bubble_count):
+		var angle_rad = deg_to_rad(angles[i])
+		var direction = Vector2(cos(angle_rad), sin(angle_rad))
+		
+		# 在世界空間獨立生成泡泡
+		_spawn_independent_bubble(spawn_pos, direction)
+		
+		# 短暫間隔，營造發射效果
+		if i < bubble_count - 1:
+			await get_tree().create_timer(0.05).timeout
+
+func _spawn_jump_emerge_bubbles():
+	"""跳躍出水時左右散射泡泡"""
+	if not bubble_scene:
+		return
+	
+	var bubble_count = 6  # 左右各3個，更多泡泡
+	var spawn_point_node = get_node_or_null("BubbleSpawnPoint")
+	var spawn_pos = global_position
+	if spawn_point_node:
+		spawn_pos = spawn_point_node.global_position
+	else:
+		spawn_pos = global_position + Vector2(0, -50)
+	
+	# 更廣的左右散射角度：-80°到+80°
+	var angles = [-80.0, -50.0, -25.0, 25.0, 50.0, 80.0]
+	
+	
+	for i in range(bubble_count):
+		var angle_rad = deg_to_rad(angles[i])
+		var direction = Vector2(cos(angle_rad), sin(angle_rad))
+		
+		# 在世界空間獨立生成泡泡
+		_spawn_independent_bubble(spawn_pos, direction)
+		
+		# 更快的連射效果
+		if i < bubble_count - 1:
+			await get_tree().create_timer(0.03).timeout
+	
 #endregion
 
 #region 波浪系統
@@ -722,7 +758,6 @@ func _spawn_waves_after_tail_swipe():
 		return
 
 	if not spawnable_manager:
-		print_debug("[Giant Fish] SpawnableManager 未初始化")
 		return
 
 	# 生成單個波浪，方向跟隨BOSS攻擊朝向
@@ -740,8 +775,10 @@ func _spawn_waves_after_tail_swipe():
 		func(obj): _setup_wave(obj, spawn_pos, direction, true)
 	)
 	
-	# 二階段才有第二波波浪
+	# 第二階段強化：召喚海浪時同時召喚2-3個泡泡
 	if is_phase_two:
+		_spawn_wave_bubbles(spawn_pos)
+		
 		# 0.5秒後生成第二波原始大小波浪
 		await get_tree().create_timer(0.5).timeout
 		spawnable_manager.spawn_with_pool(
@@ -770,6 +807,94 @@ func _setup_wave(wave: Node, spawn_pos: Vector2, direction: Vector2, is_first_wa
 	
 	if wave.has_method("initialize"):
 		wave.initialize(direction)
+
+func _spawn_wave_bubbles(wave_pos: Vector2):
+	"""海浪召喚時同時生成2-3個追蹤泡泡"""
+	if not bubble_scene or not target_player or not is_instance_valid(target_player):
+		return
+	
+	var bubble_count = randi_range(2, 3)  # 隨機2-3個泡泡
+	
+	
+	# 計算泡泡生成位置（在波浪周圍）
+	for i in range(bubble_count):
+		var offset_x = randf_range(-100.0, 100.0)  # 水平隨機偏移
+		var offset_y = randf_range(-50.0, 50.0)    # 垂直隨機偏移
+		var bubble_pos = wave_pos + Vector2(offset_x, offset_y)
+		
+		# 計算朝向玩家的方向（帶有一定追蹤性）
+		var direction_to_player = (target_player.global_position - bubble_pos).normalized()
+		
+		# 在世界空間獨立生成泡泡
+		_spawn_independent_bubble(bubble_pos, direction_to_player)
+		
+		# 短暫間隔
+		if i < bubble_count - 1:
+			await get_tree().create_timer(0.15).timeout
+
+func _spawn_charge_turn_wave():
+	"""衝撞轉向時生成1.5倍大海浪"""
+	if not wave_scene or not spawnable_manager:
+		return
+	
+	# 根據當前轉向方向生成波浪
+	var direction = Vector2.RIGHT if half_body_move_direction > 0 else Vector2.LEFT
+	
+	# 使用WaveSpawnPoint節點位置，如果沒有則使用BOSS位置
+	var spawn_point_node = get_node_or_null("WaveSpawnPoint")
+	var spawn_pos = global_position
+	if spawn_point_node:
+		spawn_pos = spawn_point_node.global_position
+	
+	
+	# 生成1.5倍大的波浪
+	spawnable_manager.spawn_with_pool(
+		wave_scene, 
+		"wave",
+		func(obj): _setup_enhanced_wave(obj, spawn_pos, direction, 1.5)
+	)
+	
+func _setup_enhanced_wave(wave: Node, spawn_pos: Vector2, direction: Vector2, scale_multiplier: float):
+	"""設置增強的波浪（可自定義倍數）"""
+	if not is_instance_valid(wave):
+		return
+		
+	wave.global_position = spawn_pos
+	
+	if wave.has_method("set_scale_multiplier"):
+		wave.set_scale_multiplier(scale_multiplier)
+	else:
+		wave.scale = Vector2(scale_multiplier, scale_multiplier)
+	
+	if wave.has_method("initialize"):
+		wave.initialize(direction)
+
+func _spawn_jump_landing_waves():
+	"""跳躍落地時生成雙向1.5倍大海浪"""
+	if not wave_scene or not spawnable_manager:
+		return
+	
+	# 使用WaveSpawnPoint節點位置，如果沒有則使用BOSS位置
+	var spawn_point_node = get_node_or_null("WaveSpawnPoint")
+	var spawn_pos = global_position
+	if spawn_point_node:
+		spawn_pos = spawn_point_node.global_position
+	
+	
+	# 同時生成向左和向右的1.5倍大海浪
+	spawnable_manager.spawn_with_pool(
+		wave_scene, 
+		"wave",
+		func(obj): _setup_enhanced_wave(obj, spawn_pos, Vector2.LEFT, 1.5)
+	)
+	
+	spawnable_manager.spawn_with_pool(
+		wave_scene, 
+		"wave", 
+		func(obj): _setup_enhanced_wave(obj, spawn_pos, Vector2.RIGHT, 1.5)
+	)
+	
+
 #endregion
 
 #region 動畫映射
@@ -804,6 +929,10 @@ func _process_idle_state(delta: float) -> void:
 		if animated_sprite:
 			animated_sprite.flip_h = direction_to_player.x < 0
 		
+		# 檢查是否可以攻擊（使用新的間隔控制）
+		if _can_attack:
+			_start_attack()
+		
 		# 在合理距離內緩慢追擊
 		if distance_to_player > 100.0:  # 保持一定距離
 			velocity.x = move_toward(velocity.x, direction_to_player.x * move_speed * 0.3, acceleration * delta)
@@ -815,6 +944,26 @@ func _process_idle_state(delta: float) -> void:
 	# 重力
 	if not is_on_floor():
 		velocity.y += gravity * delta
+
+func _start_attack():
+	"""開始攻擊（基於動畫幀+間隔計時器）"""
+	var selected_attack = select_next_action()
+	current_attack = selected_attack
+	
+	# 設置攻擊間隔（不能再攻擊）
+	_can_attack = false
+	_attack_interval_timer = randf_range(attack_interval_min, attack_interval_max)
+	
+	# 直接執行攻擊
+	match selected_attack:
+		ACTION_TAIL_SWIPE_ATTACK:
+			_prepare_tail_swipe_attack()
+		ACTION_BUBBLE_ATTACK:
+			_prepare_bubble_attack()
+		ACTION_SIDE_MOVE_ATTACK:
+			_prepare_half_body_move()
+		ACTION_JUMP_ATTACK:
+			_prepare_jump_attack()
 
 func _giant_fish_side_move_attack_state(_delta: float):
 	var current_charge_speed = move_speed * charge_speed_multiplier
@@ -878,6 +1027,10 @@ func _giant_fish_side_move_attack_state(_delta: float):
 			half_body_move_direction *= -1
 			if animated_sprite: 
 				animated_sprite.flip_h = half_body_move_direction < 0
+			
+			# 第二階段強化：衝撞轉向時生成1.5倍大海浪
+			if is_phase_two:
+				_spawn_charge_turn_wave()
 
 	if not _is_returning_to_center:
 		velocity.x = half_body_move_direction * current_charge_speed
@@ -905,9 +1058,7 @@ func _prepare_emerge_jump():
 		velocity.x = 0
 		velocity.y = emerge_jump_initial_y_velocity
 
-	# 出水時生成第一次水花
-	print_debug("[Giant Fish] 出水起跳，生成出水效果")
-	spawn_water_splashes_emerge(global_position)
+	# 出水特效現在由動畫幀觸發
 
 	_emerge_jump_air_timer = 0.0
 	_is_at_jump_apex = false
@@ -936,10 +1087,7 @@ func _giant_fish_emerge_jump_state(delta: float):
 	_previous_jump_velocity_y = velocity.y
 
 	if is_on_floor():
-		# 落地時生成第二次水花
-		print_debug("[Giant Fish] 落地入水，生成入水效果")
-		spawn_water_splashes_land(global_position)
-		
+		# 落地特效現在由動畫幀觸發
 		velocity.x = 0 
 		_is_at_jump_apex = false
 		_on_action_finished()
@@ -954,9 +1102,7 @@ func _giant_fish_emerge_jump_state(delta: float):
 func _giant_fish_tail_swipe_state(delta: float):
 	_tail_swipe_state_timer += delta
 	if _tail_swipe_state_timer >= tail_swipe_duration:
-		# 擺尾攻擊結束時生成波浪
-		# 擺尾結束，生成波浪
-		_spawn_waves_after_tail_swipe()
+		# 擺尾攻擊結束（波浪生成已由動畫幀觸發）
 		_on_action_finished()
 
 func _giant_fish_bubble_attack_state(delta: float):
@@ -970,52 +1116,112 @@ func _giant_fish_phase_transition_state(delta: float):
 		_on_action_finished()
 
 func _on_action_finished():
-	# 防止重複調用
-	if rhythm_state == AttackRhythm.RECOVERING:
-		return
-		
-	print_debug("[Giant Fish] 攻擊完成，進入恢復期")
-	_enter_recovery()
+	# 檢查是否觸發連擊
+	if _should_trigger_combo():
+		_trigger_combo()
+	else:
+		_end_combo()
+		_change_state(GiantFishState.IDLE)
 
 func _setup_shared_collision_shapes():
 	"""設置共用碰撞形狀系統 - 讓 Hitbox 和 TouchDamageArea 共用相同形狀"""
 	var main_collision = get_node_or_null("CollisionShape2D")
 	if not main_collision:
-		print_debug("[Giant Fish] 找不到主碰撞形狀")
 		return
 	
 	var main_shape = main_collision.shape
 	if not main_shape:
-		print_debug("[Giant Fish] 主碰撞形狀為空")
 		return
 	
 	# 設置 Hitbox 共用相同形狀
 	var hitbox_collision = get_node_or_null("Hitbox/CollisionShape2D")
 	if hitbox_collision:
 		hitbox_collision.shape = main_shape
-		print_debug("[Giant Fish] Hitbox 碰撞形狀已共用")
 	
 	# 設置 TouchDamageArea 共用相同形狀
 	var touch_damage_collision = get_node_or_null("TouchDamageArea/CollisionShape2D")
 	if touch_damage_collision:
 		touch_damage_collision.shape = main_shape
-		print_debug("[Giant Fish] TouchDamageArea 碰撞形狀已共用")
 	
-	print_debug("[Giant Fish] 碰撞形狀共用設置完成")
 
-func _on_field_control_triggered(pattern_name: String):
+func _on_field_control_triggered(_pattern_name: String):
 	"""場地控制觸發回調"""
-	print_debug("[Giant Fish] 場地控制已觸發: %s" % pattern_name)
+	pass
 
-func _on_field_control_completed(pattern_name: String):
+func _on_field_control_completed(_pattern_name: String):
 	"""場地控制完成回調"""
-	print_debug("[Giant Fish] 場地控制已完成: %s" % pattern_name)
+	pass
+
+func _on_frame_changed():
+	"""動畫幀變化處理（防重複觸發）"""
+	if not animated_sprite:
+		return
+		
+	var current_anim = animated_sprite.animation
+	var current_frame = animated_sprite.frame
+	
+	# 檢測動畫或狀態切換，重置觸發記錄
+	if current_anim != _last_animation or current_state != _last_state:
+		_triggered_effects.clear()
+		_last_animation = current_anim
+		_last_state = current_state
+	
+	if not ATTACK_FRAMES.has(current_anim):
+		return
+		
+	var config = ATTACK_FRAMES[current_anim]
+	
+	# 攻擊判定幀觸發特效（防重複）
+	if config.has("attack_frame") and current_frame == config.attack_frame:
+		var trigger_key = current_anim + "_attack_frame_" + str(config.attack_frame)
+		if not _triggered_effects.has(trigger_key):
+			_triggered_effects[trigger_key] = true
+			_trigger_attack_effects(current_anim)
+	
+	# 落地特效幀處理（僅用於跳躍攻擊，防重複）
+	if config.has("land_effect_frame") and current_frame == config.land_effect_frame:
+		var trigger_key = current_anim + "_land_effect_frame_" + str(config.land_effect_frame)
+		if not _triggered_effects.has(trigger_key):
+			_triggered_effects[trigger_key] = true
+			_trigger_land_effects(current_anim)
+	
+
+func _trigger_attack_effects(anim_name: String):
+	"""觸發攻擊特效"""
+	match anim_name:
+		"tail_swipe":
+			# 擺尾攻擊：生成波浪
+			_spawn_waves_after_tail_swipe()
+		"bubble_attack":
+			# 泡泡攻擊：發射泡泡
+			_spawn_bubbles_for_action()
+		"move":
+			# 側身攻擊：衝撞轉向時生成波浪（如果在第二階段）
+			if is_phase_two:
+				_spawn_charge_turn_wave()
+		"emerge_jump":
+			# 跳躍攻擊：出水時生成水花和泡泡
+			spawn_water_splashes_emerge(global_position)
+			if is_phase_two:
+				_spawn_jump_emerge_bubbles()
+
+func _trigger_land_effects(anim_name: String):
+	"""觸發落地特效"""
+	if anim_name == "emerge_jump":
+		# 跳躍落地：生成水花和波浪
+		spawn_water_splashes_land(global_position)
+		if is_phase_two:
+			_spawn_jump_landing_waves()
+
 #endregion
 
 #region 狀態變更
 func _change_state(new_state: int) -> void:
 	if current_state == new_state:
 		return
+	
+	# 狀態切換時清除觸發記錄
+	_triggered_effects.clear()
 		
 	var old_state_name = GiantFishState.find_key(current_state)
 	if old_state_name == null: 
@@ -1025,7 +1231,6 @@ func _change_state(new_state: int) -> void:
 	if new_state_name == null: 
 		new_state_name = "UNKNOWN (%d)" % new_state
 
-	print_debug("[Giant Fish] 狀態變更: %s -> %s" % [old_state_name, new_state_name])
 
 	if new_state in BossBase.BossState.values():
 		super._change_state(new_state)
@@ -1051,10 +1256,8 @@ func _change_state(new_state: int) -> void:
 			current_phase = 2
 			_phase_transition_timer = 0.0
 			can_be_interrupted = false
-			# 完全重置攻擊節奏系統，確保不會被打斷
-			rhythm_state = AttackRhythm.IDLE
-			rhythm_timer = 0.0
-			print_debug("[Giant Fish] 階段轉換開始 - 攻擊節奏系統已重置")
+			# 第二階段提升連擊能力
+			max_combo_count = 3
 			
 		GiantFishState.SIDE_MOVE_ATTACK_STATE:
 			can_be_interrupted = false
@@ -1072,7 +1275,6 @@ func take_damage(damage: float, attacker: Node, _knockback_info: Dictionary = {}
 
 	if current_health <= max_health * PHASE_TWO_HEALTH_THRESHOLD and not is_phase_two:
 		if current_state != GiantFishState.PHASE_TRANSITION:
-			print_debug("[Giant Fish] 血量低於閾值，觸發階段轉換")
 			_change_state(GiantFishState.PHASE_TRANSITION)
 
 func _on_defeated():

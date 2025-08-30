@@ -36,7 +36,6 @@ var map_bounds_calculated: bool = false
 
 func _ready():
 	super._ready()
-	print_debug("[BubbleFieldController] 泡泡場地控制系統就緒")
 
 func initialize(boss: Node2D, player: Node2D, spawnable_mgr: Node):
 	super.initialize(boss, player, spawnable_mgr)
@@ -85,7 +84,6 @@ func trigger_field_control(pattern_name: String) -> bool:
 	if not super.trigger_field_control(pattern_name):
 		return false
 	
-	print_debug("[BubbleFieldController] 執行模式: %s" % pattern_name)
 	
 	# 執行具體模式
 	match pattern_name:
@@ -98,7 +96,6 @@ func trigger_field_control(pattern_name: String) -> bool:
 		"CENTER_BURST":
 			_execute_center_burst()
 		_:
-			print_debug("[BubbleFieldController] 未知模式: %s" % pattern_name)
 			return false
 	
 	return true
@@ -112,7 +109,6 @@ func _execute_side_spray():
 	# 選擇遠離玩家的邊緣
 	var spawn_side_x = map_bounds.position.x if player_pos.x > boss_pos.x else map_bounds.position.x + map_bounds.size.x
 	
-	print_debug("[BubbleFieldController] 側邊噴射 - 從 x=%.1f 噴出 %d 個泡泡" % [spawn_side_x, side_spray_count])
 	
 	# 垂直排列泡泡
 	for i in range(side_spray_count):
@@ -132,7 +128,6 @@ func _execute_top_scatter():
 	var player_pos = get_player_position()
 	var scatter_area = 500.0  # 散落區域寬度
 	
-	print_debug("[BubbleFieldController] 上方散落 - 在玩家周圍散落 %d 個泡泡" % top_scatter_count)
 	
 	for i in range(top_scatter_count):
 		# 在玩家周圍隨機位置
@@ -154,7 +149,6 @@ func _execute_corner_advance():
 	# 選擇最近的角落
 	var corner_pos = _get_nearest_corner(player_pos)
 	
-	print_debug("[BubbleFieldController] 角落推進 - 從角落 %s 推進 %d 個泡泡" % [corner_pos, corner_advance_count])
 	
 	for i in range(corner_advance_count):
 		var progress = float(i) / float(corner_advance_count - 1)
@@ -171,7 +165,6 @@ func _execute_center_burst():
 	"""中心爆發"""
 	var boss_pos = get_boss_position()
 	
-	print_debug("[BubbleFieldController] 中心爆發 - 從BOSS位置爆發 %d 個泡泡" % center_burst_count)
 	
 	# 180度上半圓分佈（-90度到+90度），避免向地面生成泡泡
 	var angle_step = 180.0 / center_burst_count
@@ -196,12 +189,10 @@ func _execute_center_burst():
 func _spawn_independent_bubble(world_position: Vector2, direction: Vector2):
 	"""在獨立世界空間生成泡泡"""
 	if not bubble_scene or not spawnable_manager:
-		print_debug("[BubbleFieldController] 缺少必要組件，無法生成泡泡")
 		return
 	
 	var bubble = bubble_scene.instantiate()
 	if not bubble:
-		print_debug("[BubbleFieldController] 泡泡實例化失敗")
 		return
 	
 	# 添加到世界空間
@@ -214,7 +205,6 @@ func _spawn_independent_bubble(world_position: Vector2, direction: Vector2):
 	elif bubble.has_method("initialize"):
 		bubble.initialize(target_player)
 	
-	print_debug("[BubbleFieldController] 泡泡已生成於 %s，方向 %s" % [world_position, direction])
 
 func _calculate_map_bounds():
 	"""計算地圖邊界（簡化版本）"""
@@ -226,7 +216,6 @@ func _calculate_map_bounds():
 	map_bounds = Rect2(boss_pos.x - 800, boss_pos.y - 400, 1600, 800)
 	map_bounds_calculated = true
 	
-	print_debug("[BubbleFieldController] 地圖邊界設定: %s" % map_bounds)
 
 func _is_player_in_center(player_pos: Vector2) -> bool:
 	"""判斷玩家是否在地圖中央"""

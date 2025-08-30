@@ -23,7 +23,6 @@ func _ready():
 
 # 主要接口：使用物件池生成衍生物
 func spawn_with_pool(scene: PackedScene, type: String, setup_func: Callable = Callable()) -> Node:
-	print_debug("[SpawnableManager] 請求生成 %s" % type)
 	
 	if not scene:
 		push_error("[SpawnableManager] Scene is null for type: %s" % type)
@@ -34,19 +33,14 @@ func spawn_with_pool(scene: PackedScene, type: String, setup_func: Callable = Ca
 		push_error("[SpawnableManager] Failed to create object for type: %s" % type)
 		return null
 	
-	print_debug("[SpawnableManager] 對象創建成功: %s" % obj)
 	
 	# 添加到場景樹
 	add_child(obj)
 	active_spawnables.append(obj)
-	print_debug("[SpawnableManager] 對象已添加到場景樹，活躍數量: %d" % active_spawnables.size())
 	
 	# 執行設定函數
 	if setup_func.is_valid():
 		setup_func.call(obj)
-		print_debug("[SpawnableManager] 設定函數已執行")
-	else:
-		print_debug("[SpawnableManager] 無設定函數")
 	
 	# 統計
 	_update_spawn_stats(type)
@@ -54,7 +48,6 @@ func spawn_with_pool(scene: PackedScene, type: String, setup_func: Callable = Ca
 	# 發送信號
 	spawnable_created.emit(obj, type)
 	
-	print_debug("[SpawnableManager] %s 生成完成" % type)
 	return obj
 
 # 從物件池獲取或創建新物件

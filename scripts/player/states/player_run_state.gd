@@ -36,7 +36,9 @@ func get_transition() -> PlayerState:
 		return fall_state
 	
 	if Input.is_action_just_pressed("jump"):
-		return jump_state
+		# 支援土狼時間：在地面或剛離開地面時可跳躍
+		if player.is_on_floor() or player.coyote_frames_left > 0 or player.coyote_timer > 0:
+			return jump_state
 	
 	var direction = Input.get_axis("move_left", "move_right")
 	if direction == 0:

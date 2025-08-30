@@ -177,4 +177,4 @@ position = Vector2(42, 250)
 position = Vector2(-6, 428)
 
 [node name="BossFish" parent="." instance=ExtResource("9_6pp0c")]
-position = Vector2(705, 222)
+position = Vector2(-127, 215)

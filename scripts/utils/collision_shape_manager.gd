@@ -28,8 +28,6 @@ static func update_area_shape(target_area: Area2D, source_shape_node: CollisionS
 	# 使用延遲調用避免物理查詢衝突
 	target_area.call_deferred("add_child", new_shape_node)
 	
-	if owner_name != "":
-		print("[%s] CollisionShapeManager: 為 %s 創建了 CollisionShape2D，形狀: %s" % [owner_name, target_area.name, new_shape_node.shape])
 
 ## 查找第一個啟用的 CollisionShape2D
 static func find_active_shape(parent_node: Node) -> CollisionShape2D:

@@ -12,22 +12,24 @@ class_name FlyingEnemyBase
 @export var ideal_attack_height: float = 150.0
 
 @export_group("飛行物理")
-@export var wave_amplitude: float = 15.0  # 波浪幅度（減少搖擺）
-@export var wave_frequency: float = 2.0   # 波浪頻率（降低頻率）
-@export var turn_speed: float = 1.5       # 轉向速度（減緩轉向）
+@export var wave_amplitude: float = 20.0  # 波浪幅度 - 增加使起伏更明顯
+@export var wave_frequency: float = 1.3   # 波浪頻率 - 降低使更自然
+@export var turn_speed: float = 0.9       # 轉向速度 - 減緩使更平滑
+@export var velocity_inertia: float = 0.35 # 速度慣性係數 - 保留上一幀速度
 @export var banking_angle: float = 10.0   # 銀行轉彎角度（度）
-@export var min_turn_radius: float = 80.0 # 最小轉彎半徑（增加轉彎半徑）
+@export var min_turn_radius: float = 120.0 # 最小轉彎半徑 - 增加使轉彎更大
 @export var arrival_distance: float = 30.0 # 到達目標的距離閾值
 
 @export_group("外觀控制")
-@export var max_pitch_angle: float = 30.0  # 最大俯衝/爬升角度（度）
-@export var rotation_smoothing: float = 3.0 # 旋轉平滑度
+@export var max_pitch_angle: float = 15.0  # 最大俯衝/爬升角度（度）- 降低避免過度旋轉
+@export var rotation_smoothing: float = 5.0 # 旋轉平滑度 - 增加使旋轉更平滑
+@export var flip_buffer_time: float = 0.2  # 翻轉緩衝時間，避免頻繁翻轉
 
 @export_group("拍翅節奏")
-@export var flap_duration: float = 0.8    # 拍翅上升時間
-@export var glide_duration: float = 1.2   # 滑翔下降時間
-@export var flap_lift_force: float = 100.0 # 拍翅上升力
-@export var glide_fall_rate: float = 50.0  # 滑翔下降率
+@export var flap_duration: float = 0.6    # 拍翅上升時間 - 加快拍翅
+@export var glide_duration: float = 1.8   # 滑翔下降時間 - 延長滑翔
+@export var flap_lift_force: float = 160.0 # 拍翅上升力 - 增強效果
+@export var glide_fall_rate: float = 35.0  # 滑翔下降率 - 減緩下降
 #endregion
 
 #region 飛行狀態變數
@@ -37,8 +39,9 @@ var flight_phase: FlightPhase = FlightPhase.FLAP_UP
 var flap_timer: float = 0.0
 var target_direction: Vector2 = Vector2.RIGHT
 var current_direction: Vector2 = Vector2.RIGHT
+var previous_velocity: Vector2 = Vector2.ZERO  # 記錄上一幀速度用於慣性
 var is_flying: bool = true
-var flying_gravity_scale: float = 0.2
+var flying_gravity_scale: float = 0.15  # 降低使更輕盈
 var walking_gravity_scale: float = 1.0
 
 # 緊急迫降狀態
@@ -59,9 +62,13 @@ var min_movement_distance: float = 10.0  # 最小移動距離
 var last_unstuck_time: float = 0.0
 var unstuck_cooldown: float = 8.0  # 8秒內不重複解困
 
+# 翻轉控制變數
+var last_flip_time: float = 0.0
+var last_flip_state: bool = false
+
 # 模式切換控制
 var mode_switch_timer: float = 0.0
-var mode_switch_cooldown: float = 2.0  # 2秒內不重複切換模式
+var mode_switch_cooldown: float = 6.0  # 6秒內不重複切換模式 - 增加避免頻繁切換
 var last_collision_time: float = 0.0
 var collision_cooldown: float = 1.0  # 1秒內忽略重複碰撞
 
@@ -124,13 +131,18 @@ func fly_towards_target(target_pos: Vector2, speed: float, delta: float) -> void
 	# 只在距離足夠遠時應用波浪運動
 	var wave_velocity = base_velocity
 	if distance_to_target > arrival_distance:
-		wave_velocity = apply_wave_motion(base_velocity, delta)
+		wave_velocity = apply_organic_wave_motion(base_velocity, delta)
 	
-	# 應用拍翅節奏（減弱效果）
+	# 應用拍翅節奏（增強效果）
 	var final_velocity = apply_flap_rhythm(wave_velocity, delta)
+	
+	# 應用速度慣性 - 保留部分上一幀速度
+	if previous_velocity.length() > 0:
+		final_velocity = final_velocity.lerp(previous_velocity, velocity_inertia)
 	
 	# 設定速度
 	velocity = velocity.move_toward(final_velocity, acceleration * delta)
+	previous_velocity = velocity  # 記錄當前速度
 	
 	# 更新外觀朝向和旋轉
 	update_sprite_orientation(delta)
@@ -148,8 +160,26 @@ func apply_wave_motion(base_velocity: Vector2, delta: float) -> Vector2:
 	var perpendicular = Vector2(-base_velocity.y, base_velocity.x).normalized()
 	return base_velocity + perpendicular * wave_offset * delta
 
+## 應用更自然的有機波浪運動（多重波疊加）
+func apply_organic_wave_motion(base_velocity: Vector2, delta: float) -> Vector2:
+	time_counter += delta
+	
+	# 主波浪
+	var primary_wave = sin(time_counter * wave_frequency) * wave_amplitude
+	# 次要波浪（頻率和幅度不同）
+	var secondary_wave = sin(time_counter * wave_frequency * 1.7) * wave_amplitude * 0.3
+	# 細微波動
+	var micro_wave = sin(time_counter * wave_frequency * 3.2) * wave_amplitude * 0.1
+	
+	# 組合所有波浪
+	var total_wave = primary_wave + secondary_wave + micro_wave
+	
+	# 根據飛行方向調整波浪方向
+	var perpendicular = Vector2(-base_velocity.y, base_velocity.x).normalized()
+	return base_velocity + perpendicular * total_wave * delta
 
-## 應用拍翅節奏效果（減弱版本）
+
+## 應用拍翅節奏效果（增強版本）
 func apply_flap_rhythm(base_velocity: Vector2, delta: float) -> Vector2:
 	flap_timer += delta
 	
@@ -158,15 +188,20 @@ func apply_flap_rhythm(base_velocity: Vector2, delta: float) -> Vector2:
 			if flap_timer >= flap_duration:
 				flight_phase = FlightPhase.GLIDE_DOWN
 				flap_timer = 0.0
-			# 拍翅階段：輕微上升力
-			return base_velocity + Vector2(0, -flap_lift_force * 0.3 * delta)
+			# 拍翅階段：明顯上升力
+			# 使用非線性曲線使拍翅更自然
+			var flap_progress = flap_timer / flap_duration
+			var lift_curve = sin(flap_progress * PI)  # 使用sin曲線使拍翅更平滑
+			return base_velocity + Vector2(0, -flap_lift_force * lift_curve * 0.7 * delta)
 		
 		FlightPhase.GLIDE_DOWN:
 			if flap_timer >= glide_duration:
 				flight_phase = FlightPhase.FLAP_UP
 				flap_timer = 0.0
-			# 滑翔階段：輕微下降
-			return base_velocity + Vector2(0, glide_fall_rate * 0.3 * delta)
+			# 滑翔階段：緩慢下降
+			var glide_progress = flap_timer / glide_duration
+			var fall_curve = 1.0 - cos(glide_progress * PI * 0.5)  # 使用cos曲線使下降更緩和
+			return base_velocity + Vector2(0, glide_fall_rate * fall_curve * 0.5 * delta)
 	
 	return base_velocity
 
@@ -202,38 +237,47 @@ func update_flying_orientation(delta: float) -> void:
 	# 使用飛行意圖方向而非實際速度來決定朝向
 	var movement_vector = current_direction if current_direction.length() > 0.1 else velocity.normalized()
 	
+	# 獲取當前時間
+	var current_time = Time.get_time_dict_from_system().hour * 3600 + Time.get_time_dict_from_system().minute * 60 + Time.get_time_dict_from_system().second
 	
-	# 1. 更新水平翻轉（面向飛行意圖方向）
+	# 1. 更新水平翻轉（面向飛行意圖方向）- 添加緩衝時間
 	if movement_vector.length() > 0.1:
 		var should_flip = movement_vector.x < 0
-		if animated_sprite.flip_h != should_flip:
-			animated_sprite.flip_h = should_flip
+		# 檢查是否可以翻轉（緩衝時間已過且狀態確實改變）
+		if animated_sprite.flip_h != should_flip and (current_time - last_flip_time) >= flip_buffer_time:
+			# 只在明顯的方向改變時翻轉（避免在接近垂直飛行時頻繁翻轉）
+			if abs(movement_vector.x) > 0.3:  # 添加死區
+				animated_sprite.flip_h = should_flip
+				last_flip_time = current_time
+				last_flip_state = should_flip
 	
-	# 2. 計算俯衝/爬升角度（使用飛行意圖方向）
+	# 2. 計算俯衝/爬升角度（使用飛行意圖方向）- 減少角度
 	var pitch_angle = 0.0
 	if movement_vector.length() > 0.1:
 		# 根據飛行意圖的垂直分量計算角度
 		var vertical_ratio = movement_vector.y / movement_vector.length()
-		pitch_angle = vertical_ratio * max_pitch_angle
+		# 使用更平滑的計算方式，避免極端角度
+		pitch_angle = vertical_ratio * max_pitch_angle * 0.7  # 額外減少30%
 		# 限制角度範圍
 		pitch_angle = clamp(pitch_angle, -max_pitch_angle, max_pitch_angle)
 	
-	# 3. 簡化銀行轉彎角度計算
+	# 3. 簡化銀行轉彎角度計算 - 進一步減弱效果
 	var bank_angle = 0.0
 	# 迫降時不應用銀行轉彎，避免歪斜
-	if not is_emergency_landing and current_direction.length() > 0 and velocity.length() > 5.0:
+	if not is_emergency_landing and current_direction.length() > 0 and velocity.length() > 10.0:  # 提高速度閾值
 		# 使用轉向角速度來計算銀行角度
 		var angular_velocity = current_direction.angle_to(velocity.normalized())
-		bank_angle = clamp(angular_velocity * banking_angle * 0.2, -banking_angle * 0.3, banking_angle * 0.3)
+		# 進一步減弱銀行轉彎效果
+		bank_angle = clamp(angular_velocity * banking_angle * 0.1, -banking_angle * 0.2, banking_angle * 0.2)
 	
 	# 4. 組合最終旋轉角度
 	var target_rotation = pitch_angle + bank_angle
 	
-	# 5. 平滑過渡到目標旋轉
+	# 5. 平滑過渡到目標旋轉 - 使用更強的平滑
 	animated_sprite.rotation_degrees = lerp(
 		animated_sprite.rotation_degrees,
 		target_rotation,
-		rotation_smoothing * delta
+		rotation_smoothing * delta * 0.8  # 額外減慢20%
 	)
 
 

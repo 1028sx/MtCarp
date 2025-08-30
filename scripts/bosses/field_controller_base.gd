@@ -30,7 +30,7 @@ signal field_control_completed(pattern_name: String)
 #endregion
 
 func _ready():
-	print_debug("[FieldController] 場地控制系統初始化")
+	pass
 
 func initialize(boss: Node2D, player: Node2D, spawnable_mgr: Node):
 	"""初始化場地控制系統"""
@@ -38,7 +38,6 @@ func initialize(boss: Node2D, player: Node2D, spawnable_mgr: Node):
 	target_player = player
 	spawnable_manager = spawnable_mgr
 	
-	print_debug("[FieldController] 系統初始化完成 - BOSS: %s, 玩家: %s" % [boss, player])
 
 func _process(_delta: float):
 	if not is_initialized():
@@ -61,7 +60,6 @@ func _update_cooldown():
 		var current_time = Time.get_ticks_msec() / 1000.0
 		if current_time - last_trigger_time >= cooldown_time:
 			is_cooldown = false
-			print_debug("[FieldController] 冷卻結束，可以觸發場地控制")
 
 func _check_auto_trigger():
 	"""檢查是否應該自動觸發場地控制"""
@@ -78,16 +76,13 @@ func _check_auto_trigger():
 
 func select_field_control_pattern() -> String:
 	"""選擇場地控制模式 - 子類應該覆寫此函數"""
-	print_debug("[FieldController] 基類無可用模式，請在子類中實現")
 	return ""
 
 func trigger_field_control(pattern_name: String) -> bool:
 	"""觸發場地控制 - 子類應該覆寫此函數"""
 	if is_cooldown:
-		print_debug("[FieldController] 場地控制冷卻中，跳過觸發")
 		return false
 	
-	print_debug("[FieldController] 觸發場地控制: %s" % pattern_name)
 	
 	# 更新狀態
 	last_trigger_time = Time.get_ticks_msec() / 1000.0
@@ -102,7 +97,6 @@ func trigger_field_control(pattern_name: String) -> bool:
 
 func on_field_control_completed(pattern_name: String):
 	"""場地控制完成回調"""
-	print_debug("[FieldController] 場地控制完成: %s" % pattern_name)
 	field_control_completed.emit(pattern_name)
 
 func get_player_position() -> Vector2:
@@ -136,6 +130,5 @@ func get_debug_info() -> Dictionary:
 
 func print_debug_status():
 	"""打印調試狀態"""
-	var info = get_debug_info()
-	print_debug("[FieldController] 狀態: %s" % info)
+	pass
 #endregion

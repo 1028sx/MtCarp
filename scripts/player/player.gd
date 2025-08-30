@@ -19,8 +19,8 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @export var speed = 200.0
 @export var jump_velocity = -450.0
 @export var max_jumps = 2
-@export var jump_buffer_time = 0.2
-@export var coyote_time = 0.1
+@export var jump_buffer_time = 0.2  # 保留原值作為fallback
+@export var coyote_time = 0.1       # 保留原值作為fallback
 
 @export_group("Dash")
 @export var dash_speed = 250.0
@@ -50,6 +50,13 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @export var wall_jump_horizontal_force: float = 300.0
 @export var wall_jump_vertical_force_multiplier: float = 0.6
 @export var wall_double_jump_multiplier: float = 0.8
+
+@export_group("Variable Jump - Gravity Scaling")
+@export var enable_gravity_scaling: bool = true
+@export var reduced_gravity_scale: float = 0.4  # 上升時重力縮放(40%)
+@export var max_hold_time: float = 0.4          # 最大按住時間
+@export var coyote_frames: int = 6              # 土狼時間(幀)
+@export var jump_buffer_frames: int = 5         # 跳躍緩衝(幀)
 #endregion
 
 #region 節點引用
@@ -98,6 +105,16 @@ var camera_move_speed := 500.0
 var default_camera_zoom := Vector2(1.2, 1.2)
 var camera_mode_zoom := Vector2(1, 1)
 var camera_zoom_duration := 0.5
+
+# 重力縮放跳躍系統
+var is_jump_held: bool = false
+var jump_hold_timer: float = 0.0
+var is_ascending: bool = false
+var current_gravity_scale: float = 1.0
+
+# 幀精確的跳躍系統
+var jump_buffer_frames_left: int = 0
+var coyote_frames_left: int = 0
 var camera_zoom_tween: Tween
 var previous_zoom := Vector2(1.2, 1.2)
 
@@ -247,6 +264,17 @@ func _physics_process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("jump"):
 		jump_buffer_timer = jump_buffer_time
+		jump_buffer_frames_left = jump_buffer_frames  # 設置幀精確緩衝
+		# 開始跟蹤跳躍按鍵按住狀態
+		if enable_gravity_scaling:
+			is_jump_held = true
+			jump_hold_timer = 0.0
+	
+	if event.is_action_released("jump"):
+		# 跳躍按鍵釋放，立即恢復重力
+		if enable_gravity_scaling:
+			is_jump_held = false
+			current_gravity_scale = 1.0
 	
 	if is_camera_mode and event is InputEventMouseButton:
 		_handle_camera_zoom(event)
@@ -508,6 +536,12 @@ func _update_global_timers(delta: float) -> void:
 	if coyote_timer > 0:
 		coyote_timer -= delta
 	
+	# 更新幀精確計數器
+	if jump_buffer_frames_left > 0:
+		jump_buffer_frames_left -= 1
+	if coyote_frames_left > 0:
+		coyote_frames_left -= 1
+	
 	if wall_jump_cooldown_timer > 0:
 		wall_jump_cooldown_timer -= delta
 
@@ -538,6 +572,7 @@ func _update_cooldowns(delta: float) -> void:
 func _on_landed() -> void:
 	jump_count = 0
 	coyote_timer = coyote_time
+	coyote_frames_left = coyote_frames  # 設置幀精確土狼時間
 	last_jump_was_wall_jump = false
 	is_double_jumping_after_wall_jump = false
 	set_can_ground_slam(false)
@@ -582,6 +617,11 @@ func get_raycast_wall_normal() -> Vector2:
 		return Vector2.LEFT
 
 	return Vector2.ZERO
+
+func safe_play_animation(animation_name: String) -> void:
+	"""安全播放動畫，避免重複播放相同動畫"""
+	if animated_sprite and animated_sprite.animation != animation_name:
+		animated_sprite.play(animation_name)
 
 #endregion
 
@@ -967,7 +1007,6 @@ func get_health_percentage() -> float:
 #region 禁錮系統函數
 func enter_imprisonment(bubble: Node):
 	"""進入禁錮狀態"""
-	print_debug("[Player] 進入禁錮狀態，泡泡: %s" % bubble)
 	
 	# 保存原始顏色
 	original_modulate = modulate
@@ -985,15 +1024,12 @@ func enter_imprisonment(bubble: Node):
 	
 	# 重置狀態檢查計時器
 	imprisonment_check_timer = 0.0
-	
-	print_debug("[Player] 禁錮狀態已建立")
 
 func exit_imprisonment():
 	"""退出禁錮狀態"""
 	if not is_imprisoned:
 		return
 		
-	print_debug("[Player] 退出禁錮狀態")
 	
 	# 強制重置所有視覺特效
 	modulate = Color.WHITE      # 強制重置為白色，不依賴 original_modulate
@@ -1011,8 +1047,6 @@ func exit_imprisonment():
 	# 確保沒有其他視覺效果殘留
 	if animated_sprite:
 		animated_sprite.rotation = 0.0  # 確保精靈也沒有旋轉
-	
-	print_debug("[Player] 禁錮狀態已解除，所有特效已清除")
 
 func _process_imprisonment_movement():
 	"""處理禁錮時的移動同步"""
@@ -1034,7 +1068,6 @@ func _validate_imprisonment_state_player() -> bool:
 		return true  # 不在禁錮狀態，無需驗證
 	
 	if not imprisoning_source:
-		print_debug("[Player] 🔧 狀態修復 - 處於禁錮狀態但無泡泡源")
 		exit_imprisonment()
 		return false
 		

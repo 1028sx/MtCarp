@@ -95,7 +95,6 @@ func _check_wall_collision():
 	
 	var result = space_state.intersect_ray(query)
 	if result:
-		print_debug("[Wave] 撞到牆壁，銷毀")
 		_destroy()
 
 func _hit_target(target: Node):
@@ -103,7 +102,6 @@ func _hit_target(target: Node):
 		return
 		
 	has_hit_player = true
-	print_debug("[Wave] 命中目標: %s" % target)
 	
 	# 對目標造成傷害並施加擊退效果
 	if target.has_method("take_damage"):

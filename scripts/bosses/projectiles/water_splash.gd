@@ -70,7 +70,6 @@ func _check_ground_collision():
 	
 	var result = space_state.intersect_ray(query)
 	if result and velocity.y > 0:  # 只在下降時檢測
-		print_debug("[WaterSplash] 撞到地面，消散")
 		_destroy()
 
 func _on_body_entered(body: Node2D):
@@ -79,7 +78,6 @@ func _on_body_entered(body: Node2D):
 		
 	# 檢查是否撞到玩家
 	if body.has_method("take_damage") and not has_hit_player:
-		print_debug("[WaterSplash] 命中目標: %s" % body)
 		body.take_damage(damage, self)
 		has_hit_player = true
 		# 不銷毀，繼續飛行
@@ -92,7 +90,6 @@ func _on_area_entered(area: Area2D):
 	# 如果玩家有受傷區域（Area2D）
 	var parent = area.get_parent()
 	if parent and parent.has_method("take_damage") and not has_hit_player:
-		print_debug("[WaterSplash] 命中目標區域: %s" % parent)
 		parent.take_damage(damage, self)
 		has_hit_player = true
 		# 不銷毀，繼續飛行

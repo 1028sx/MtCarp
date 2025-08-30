@@ -31,7 +31,6 @@ func _ready() -> void:
 		animated_sprite.stop()  # 確保一開始沒有動畫播放
 	
 	_connect_signals()
-	print("Door ", name, " _ready finished. modulate.a=", modulate.a, " room_cleared=", room_cleared)
 
 func _process(_delta: float) -> void:
 	if player_in_area and Input.is_action_just_pressed("jump"):
