@@ -29,7 +29,9 @@ GlobalUi="*res://autoload/global_ui.gd"
 GameManager="*res://scripts/managers/game_manager.gd"
 PlayerGlobal="*res://scripts/globals/PlayerGlobal.gd"
 ItemManager="*res://scripts/managers/item_manager.gd"
-SceneManager="*res://scripts/managers/scene_manager.gd"
+RespawnManager="*res://scripts/managers/respawn_manager.gd"
+EnemyManager="*res://scripts/managers/enemy_manager.gd"
+BossManager="*res://scripts/managers/boss_manager.gd"
 
 [editor]
 

@@ -19,8 +19,8 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @export var speed = 200.0
 @export var jump_velocity = -450.0
 @export var max_jumps = 2
-@export var jump_buffer_time = 0.2  # 保留原值作為fallback
-@export var coyote_time = 0.1       # 保留原值作為fallback
+@export var jump_buffer_time = 0.2
+@export var coyote_time = 0.1
 
 @export_group("Dash")
 @export var dash_speed = 250.0
@@ -205,13 +205,12 @@ var imprisoning_source: Node = null
 
 # 定期狀態檢查計時器
 var imprisonment_check_timer: float = 0.0
-var imprisonment_check_interval: float = 1.5  # 每1.5秒檢查一次（略不同於泡泡，避免同步）
+var imprisonment_check_interval: float = 1.5  # 每1.5秒檢查一次（與泡泡錯開，避免同步）
 
 # 性能優化：緩存驗證結果
 var source_validity_cache: bool = true          # 緩存泡泡源有效性
 var last_source_validity_check: float = 0.0     # 上次檢查時間
 var source_validity_cache_duration: float = 0.1 # 緩存持續時間（100ms）
-var original_modulate: Color = Color.WHITE
 #endregion
 
 #region 生命週期函數
@@ -222,11 +221,9 @@ func _ready() -> void:
 	current_attack_damage = base_attack_damage
 	current_special_attack_damage = base_special_attack_damage
 	active_effects = {}
-	# emit_signal("effect_changed", active_effects) # 改用以下更直接的方式
 	effect_changed.emit(active_effects)
 
-	# Register with PlayerGlobal
-	if PlayerGlobal: # Autoload PlayerGlobal 自身
+	if PlayerGlobal:
 		PlayerGlobal.register_player(self)
 
 func _physics_process(delta: float) -> void:
@@ -284,9 +281,7 @@ func _input(event: InputEvent) -> void:
 		state_machine._input(event)
 
 func _tree_exiting() -> void:
-	# Unregister from PlayerGlobal when the player is removed from the scene tree
-	# if PlayerGlobal and PlayerGlobal.get_player() == self: # 原來的調用方式
-	if PlayerGlobal and PlayerGlobalScript.get_player() == self: # 修改後的調用方式
+	if PlayerGlobal and PlayerGlobalScript.get_player() == self:
 		PlayerGlobal.unregister_player()
 
 #endregion
@@ -296,6 +291,8 @@ func _initialize_player() -> void:
 	add_to_group("player")
 	current_health = max_health
 	gold = 0
+	is_imprisoned = false
+	imprisoning_source = null
 
 
 func _connect_signals() -> void:
@@ -449,14 +446,12 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 			
 		return
 
-	# 6. Handle interruption vs Super Armor (only if not dead and not invincible/dashing)
 	var has_super_armor = false
 	# 檢查當前狀態是否提供霸體 (目前只有 SpecialAttack)
 	if state_machine and state_machine.current_state is PlayerSpecialAttackState:
 		has_super_armor = true
 
 	if not has_super_armor:
-		# --- Interruption Logic --- (沒有霸體，正常受傷反應)
 
 		# 重置連擊 (如果需要)
 		var game_manager = get_tree().get_first_node_in_group("game_manager")
@@ -466,7 +461,7 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 		# 轉換到 Hurt 狀態
 		if state_machine and state_machine.states.has("hurt"):
 			state_machine._transition_to(state_machine.states["hurt"])
-		set_invincible(invincible_duration) # 將無敵時間的賦予移回到這裡
+		set_invincible(invincible_duration)
 		
 		# 重置因被打斷而應取消的狀態或能力
 		last_jump_was_wall_jump = false
@@ -619,7 +614,6 @@ func get_raycast_wall_normal() -> Vector2:
 	return Vector2.ZERO
 
 func safe_play_animation(animation_name: String) -> void:
-	"""安全播放動畫，避免重複播放相同動畫"""
 	if animated_sprite and animated_sprite.animation != animation_name:
 		animated_sprite.play(animation_name)
 
@@ -705,7 +699,6 @@ func apply_effect(effect: Dictionary) -> void:
 			has_ice_freeze = true
 			ice_freeze_timer = 0.0
 
-	# 如果效果列表真的改變了，才發出信號
 	if active_effects.size() != previous_effects_count or not active_effects.has(effect_type):
 		effect_changed.emit(active_effects)
 
@@ -799,6 +792,8 @@ func reset_all_states() -> void:
 	current_health = max_health
 	
 	is_invincible = false
+	is_imprisoned = false
+	imprisoning_source = null
 	
 	dash_cooldown_timer = 0
 	dash_timer = 0
@@ -992,7 +987,6 @@ func _handle_ground_slam_input() -> void:
 			if state_machine and state_machine.states.has("groundslam"): 
 				state_machine._transition_to(state_machine.states["groundslam"])
 
-# Setter function for can_perform_ground_slam with logging
 func set_can_ground_slam(value: bool) -> void:
 	if can_perform_ground_slam != value: 
 		can_perform_ground_slam = value
@@ -1006,17 +1000,12 @@ func get_health_percentage() -> float:
 
 #region 禁錮系統函數
 func enter_imprisonment(bubble: Node):
-	"""進入禁錮狀態"""
-	
-	# 保存原始顏色
-	original_modulate = modulate
-	
 	# 設置禁錮狀態
 	is_imprisoned = true
 	imprisoning_source = bubble
 	_invalidate_source_cache()  # 緩存失效，因為泡泡源改變
 	
-	# 套用藍色調制效果
+	# 套用藍色效果
 	modulate = Color(0.7, 0.7, 1.0, 1.0)
 	
 	# 停止當前速度
@@ -1026,27 +1015,25 @@ func enter_imprisonment(bubble: Node):
 	imprisonment_check_timer = 0.0
 
 func exit_imprisonment():
-	"""退出禁錮狀態"""
+	#退出禁錮狀態
 	if not is_imprisoned:
 		return
 		
 	
 	# 強制重置所有視覺特效
-	modulate = Color.WHITE      # 強制重置為白色，不依賴 original_modulate
-	rotation = 0.0              # 清除旋轉效果
+	modulate = Color.WHITE
+	rotation = 0.0
 	
 	# 重置禁錮狀態
 	is_imprisoned = false
 	imprisoning_source = null
 	imprisonment_check_timer = 0.0  # 重置檢查計時器
 	_invalidate_source_cache()  # 緩存失效，因為泡泡源改變
-	
-	# 恢復正常物理
+
 	velocity = Vector2.ZERO
-	
-	# 確保沒有其他視覺效果殘留
+
 	if animated_sprite:
-		animated_sprite.rotation = 0.0  # 確保精靈也沒有旋轉
+		animated_sprite.rotation = 0.0
 
 func _process_imprisonment_movement():
 	"""處理禁錮時的移動同步"""
@@ -1054,8 +1041,7 @@ func _process_imprisonment_movement():
 	if not imprisoning_source or not _is_imprisoning_source_valid_cached():
 		exit_imprisonment()
 		return
-	
-	# 添加位置偏移，讓玩家看起來在泡泡內部
+
 	var player_offset = Vector2(0, -50)  # 向上偏移50像素
 	global_position = imprisoning_source.global_position + player_offset
 	
@@ -1065,25 +1051,13 @@ func _process_imprisonment_movement():
 func _validate_imprisonment_state_player() -> bool:
 	"""驗證禁錮狀態的一致性（玩家端）"""
 	if not is_imprisoned:
-		return true  # 不在禁錮狀態，無需驗證
+		return true
 	
-	if not imprisoning_source:
+	if not imprisoning_source or not is_instance_valid(imprisoning_source):
 		exit_imprisonment()
 		return false
 		
-	if not is_instance_valid(imprisoning_source):
-		print_debug("[Player] 🔧 狀態修復 - 泡泡源已失效，自動清理狀態")
-		exit_imprisonment()
-		return false
-		
-	# 檢查泡泡端狀態是否與玩家端一致
-	if imprisoning_source.current_state != 2 or imprisoning_source.imprisoned_player != self:  # 2 = IMPRISONING
-		print_debug("[Player] 🔧 狀態不同步 - 泡泡端與玩家端狀態不符")
-		print_debug("[Player] 詳細信息: 泡泡狀態=%s (期望=2), imprisoned_player=%s (期望=%s)" % [imprisoning_source.current_state, imprisoning_source.imprisoned_player, self])
-		exit_imprisonment()
-		return false
-	
-	return true  # 狀態一致
+	return true
 
 func get_imprisonment_debug_status() -> Dictionary:
 	"""獲取禁錮系統調試狀態信息"""

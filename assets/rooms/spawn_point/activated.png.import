@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cnjt1tysj1h7a"
-path="res://.godot/imported/HEALING.png-698fac83005e83f785595b877178e505.ctex"
+uid="uid://cnr7fwjpgw728"
+path="res://.godot/imported/activated.png-4804ddbd23bb4cc67dc74143b68c70c3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/players/Sprites/HEALING.png"
-dest_files=["res://.godot/imported/HEALING.png-698fac83005e83f785595b877178e505.ctex"]
+source_file="res://assets/rooms/spawn_point/activated.png"
+dest_files=["res://.godot/imported/activated.png-4804ddbd23bb4cc67dc74143b68c70c3.ctex"]
 
 [params]
 

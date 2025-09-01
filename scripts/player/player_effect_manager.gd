@@ -90,25 +90,7 @@ func play_double_jump(flip_h: bool = false) -> void:
 	var effect_position = global_position
 	effect_position.y += 80
 	effect_instance.global_position = effect_position
-	
-	# 移除對 player.has_jump_impact 的檢查，因為該功能已刪除
-	# var player = get_parent()
-	# if player and player.has_jump_impact:
-	# 	var tween = create_tween()
-	# 	tween.set_parallel(true)
-	# 	tween.set_trans(Tween.TRANS_SINE)
-	# 	tween.set_ease(Tween.EASE_OUT)
-	# 	
-	# 	var start_scale = Vector2(0.5, 0.5)
-	# 	var max_scale = Vector2(1.5, 1.5)
-	# 	var max_distance = 60.0
-	# 	
-	# 	effect_instance.scale = start_scale
-	# 	
-	# 	tween.tween_property(effect_instance, "scale", max_scale, 0.8)
-	# 	tween.tween_property(effect_instance, "global_position:y", effect_position.y + max_distance, 1.5)
-	# else:
-	# 	# 總是使用普通縮放，因為 jump_impact 已移除
+
 	effect_instance.scale = Vector2(1.0, 1.0)
 	
 	_play_effect_animation(effect_instance, "smoke")
@@ -137,7 +119,7 @@ func play_charge_effect(charge_multiplier: float = 1.0) -> void:
 	effect_instance.global_position = global_position
 	var scale_multiplier = 1.0
 	if charge_multiplier >= 3.0:
-		scale_multiplier = 1.5  # 3倍時使用更大的特效
+		scale_multiplier = 1.5
 	effect_instance.scale = Vector2.ONE * scale_multiplier
 	
 	_play_effect_animation(effect_instance, "default")
@@ -151,7 +133,7 @@ func play_charge_complete_effect() -> void:
 	
 	effect_instance.global_position = global_position
 	effect_instance.scale = Vector2.ONE * CHARGE_COMPLETE_SCALE
-	effect_instance.modulate = Color.WHITE  # 重置為原始顏色
+	effect_instance.modulate = Color.WHITE
 	
 	_play_effect_animation(effect_instance, "default")
 
@@ -165,7 +147,7 @@ func play_heal_effect() -> void:
 		
 	_setup_effect_instance(effect_instance, false)
 	
-	# 設置特效位置（在玩家中心位置）
+	# 設置特效位置
 	var effect_position = global_position
 	effect_instance.global_position = effect_position
 	

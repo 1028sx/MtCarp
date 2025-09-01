@@ -1,17 +1,15 @@
-extends Node2D
+extends "res://addons/MetroidvaniaSystem/Template/Scripts/MetSysGame.gd"
 
 #region 節點引用
-@onready var player = $Player
-@onready var enemy_manager = preload("res://scenes/managers/enemy_manager.tscn").instantiate()
+@onready var game_player = $Player
+@onready var enemy_manager = EnemyManager
 @onready var item_manager = preload("res://scenes/managers/item_manager.tscn").instantiate()
 @onready var ui = preload("res://scenes/ui/ui.tscn").instantiate()
 @onready var loot_selection_ui = preload("res://scenes/ui/loot_selection_ui.tscn")
-@onready var game_manager = preload("res://scenes/managers/game_manager.tscn").instantiate()
+@onready var game_manager = GameManager
 var boss_ui_scene = preload("res://scenes/ui/boss_ui.tscn")
 var boss_ui = null
 
-func _get_room_manager() -> Node:
-	return get_node("/root/RoomManager")
 
 func _enter_tree() -> void:
 	await get_tree().process_frame
@@ -20,11 +18,18 @@ func _ready():
 	if not is_in_group("main"):
 		add_to_group("main")
 	
-	if not player:
+	if not game_player:
 		return
 	
-	if not player.health_changed.is_connected(_on_player_health_changed):
-		player.health_changed.connect(_on_player_health_changed)
+	
+	# 設置MetSys玩家追蹤
+	set_player(game_player)
+	
+	# 添加房間轉換模塊
+	add_module("RoomTransitions.gd")
+	
+	if not game_player.health_changed.is_connected(_on_player_health_changed):
+		game_player.health_changed.connect(_on_player_health_changed)
 	
 	_pause_stack = 0
 	get_tree().paused = false
@@ -38,12 +43,6 @@ func _ready():
 	if not global_ui:
 		return
 	
-	var existing_enemy_manager = get_tree().get_first_node_in_group("enemy_manager")
-	if existing_enemy_manager:
-		enemy_manager = existing_enemy_manager
-	else:
-		add_child(enemy_manager)
-		enemy_manager.add_to_group("enemy_manager")
 	
 	var existing_item_manager = get_tree().get_first_node_in_group("item_manager")
 	if existing_item_manager:
@@ -52,21 +51,15 @@ func _ready():
 		add_child(item_manager)
 		item_manager.add_to_group("item_manager")
 	
-	var existing_game_manager = get_tree().get_first_node_in_group("game_manager")
-	if existing_game_manager:
-		game_manager = existing_game_manager
-	else:
-		add_child(game_manager)
-		game_manager.add_to_group("game_manager")
 	
 	add_child(ui)
 	ui.name = "UI"
 	
-	if player and ui:
-		if not player.gold_changed.is_connected(ui.update_gold):
-			player.gold_changed.connect(ui.update_gold)
-		if not player.health_changed.is_connected(ui._on_player_health_changed):
-			player.health_changed.connect(ui._on_player_health_changed)
+	if game_player and ui:
+		if not game_player.gold_changed.is_connected(ui.update_gold):
+			game_player.gold_changed.connect(ui.update_gold)
+		if not game_player.health_changed.is_connected(ui._on_player_health_changed):
+			game_player.health_changed.connect(ui._on_player_health_changed)
 	
 
 	var autoload_boss_ui = get_node_or_null("/root/BossUI")
@@ -116,7 +109,18 @@ func _ready():
 	global_ui.setup_inventory()
 	
 	_initialize_game()
-	_setup_initial_room()
+	
+	# 連接room_loaded信號來處理房間載入後的邏輯
+	if not room_loaded.is_connected(_on_room_loaded):
+		room_loaded.connect(_on_room_loaded)
+	
+	# 使用MetSys載入初始房間
+	await load_room("beginning/Beginning1.tscn")
+	
+	# 確保攝影機限制正確設定
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_setup_camera_limits()
 #endregion
 
 #region 狀態變量
@@ -129,45 +133,76 @@ var _pause_stack: int = 0
 func _initialize_game():
 	_initialize_sizes()
 	
-	if player:
-		if not player.health_changed.is_connected(_on_player_health_changed):
-			player.health_changed.connect(_on_player_health_changed)
+	# 初始化MetSys存檔系統
+	_initialize_metsys()
+	
+	if game_player:
+		if not game_player.health_changed.is_connected(_on_player_health_changed):
+			game_player.health_changed.connect(_on_player_health_changed)
 	
 	_connect_signals()
 
+func _initialize_metsys():
+	if MetSys:
+		MetSys.set_save_data()
+
 func _connect_signals():
-	await get_tree().process_frame
-	
-	var room_manager = get_node("/root/RoomManager")
-	if not room_manager:
-		return
-		
-	if room_manager.has_signal("room_changed"):
-		if not room_manager.is_connected("room_changed", _on_room_changed):
-			room_manager.connect("room_changed", _on_room_changed)
-	
-	if player:
-		if not player.health_changed.is_connected(_on_player_health_changed):
-			player.health_changed.connect(_on_player_health_changed)
+	# MetSys會自動處理房間轉換信號
+	# 只需要連接玩家相關信號
+	if game_player:
+		if not game_player.health_changed.is_connected(_on_player_health_changed):
+			game_player.health_changed.connect(_on_player_health_changed)
 
 func _initialize_sizes():
-	screen_size = get_viewport_rect().size
+	screen_size = get_viewport().get_visible_rect().size
 	world_size = Vector2(1920, 1080)
 
+func _get_room_manager() -> Node:
+	return get_node("/root/RoomManager")
+
+func _on_room_loaded():
+	if game_player and map:
+		if game_player.get_parent():
+			game_player.get_parent().remove_child(game_player)
+		map.add_child(game_player)
+	
+	_setup_player_position()
+	
+	# 房間載入後立即設定攝影機限制
+	await get_tree().process_frame
+	_setup_camera_limits()
+	
+	if enemy_manager:
+		var current_room_name = MetSys.get_current_room_name()
+		enemy_manager.spawn_enemies_for_room(current_room_name)
+		
+	# 生成BOSS
+	if BossManager:
+		var current_room_name = MetSys.get_current_room_name()
+		BossManager.spawn_bosses_for_room(current_room_name)
+
 func _setup_initial_room():
-	var initial_room = load("res://scenes/rooms/Beginning1.tscn").instantiate()
+	var initial_room = load("res://scenes/rooms/beginning/Beginning1.tscn").instantiate()
 	add_child(initial_room)
 	
-	_setup_player_position(initial_room)
+	_setup_player_position()
+	
+	# 確保初始房間也設定攝影機限制
+	await get_tree().process_frame
+	_setup_camera_limits()
 	
 	if enemy_manager:
 		enemy_manager.spawn_enemies_for_room("Beginning1")
+		
+	# 生成初始房間BOSS  
+	if BossManager:
+		BossManager.spawn_bosses_for_room("Beginning1")
 
-func _setup_player_position(room):
-	if not player or not room:
+func _setup_player_position():
+	if not game_player or not map:
 		return
 		
-	var spawn_points = room.get_node_or_null("SpawnPoints")
+	var spawn_points = map.get_node_or_null("SpawnPoints")
 	if not spawn_points:
 		return
 		
@@ -175,17 +210,49 @@ func _setup_player_position(room):
 	if not left_spawn:
 		return
 		
-	player.global_position = left_spawn.global_position
-	player.process_mode = Node.PROCESS_MODE_ALWAYS
-	player.visible = true
+	await get_tree().process_frame
+	
+	game_player.position = left_spawn.position
+	
+	var camera = game_player.get_node_or_null("Camera2D")
+	if camera:
+		camera.force_update_scroll()
+	
+	_setup_camera_limits()
 
-func _spawn_initial_enemies(room: Node) -> void:
-	if enemy_manager and room:
-		var enemy_spawn_points = room.get_node_or_null("EnemySpawnPoints")
-		if enemy_spawn_points and enemy_spawn_points.get_child_count() > 0:
-			for spawn_point in enemy_spawn_points.get_children():
-				if spawn_point.name.begins_with("Spawn"):
-					_spawn_enemy(spawn_point)
+func _setup_camera_limits() -> void:
+	# 安全檢查
+	if not is_instance_valid(game_player) or not is_instance_valid(map):
+		return
+	
+	var camera = game_player.get_node_or_null("Camera2D")
+	if not is_instance_valid(camera):
+		return
+	
+	# 使用 MetSys 的 RoomInstance 設定攝影機限制
+	var room_instance = MetSys.get_current_room_instance()
+	if not is_instance_valid(room_instance):
+		# 如果沒有從 MetSys 取得，嘗試從場景取得
+		room_instance = map.get_node_or_null("RoomInstance")
+	
+	if is_instance_valid(room_instance) and room_instance.has_method("adjust_camera_limits"):
+		# 檢查房間大小計算
+		if room_instance.has_method("get_size"):
+			# 使用 MetSys 原生的 adjust_camera_limits 方法
+			room_instance.adjust_camera_limits(camera)
+	else:
+		# 作為後備，設定預設限制以避免攝影機完全無限制
+		_set_fallback_camera_limits(camera)
+
+func _set_fallback_camera_limits(camera: Camera2D) -> void:
+	# 使用當前場景的預設大小作為後備
+	camera.limit_left = 0
+	camera.limit_top = 0 
+	camera.limit_right = 1920
+	camera.limit_bottom = 1080
+
+
+# 舊的敵人生成邏輯已移除 - 現在由EnemyManager基於Marker2D自動處理
 #endregion
 
 #region 遊戲系統
@@ -193,15 +260,13 @@ func request_pause():
 	_pause_stack += 1
 	if _pause_stack > 0:
 		get_tree().paused = true
-		if enemy_manager and enemy_manager.has_method("stop_auto_spawn"):
-			enemy_manager.stop_auto_spawn()
+		# auto_spawn功能已移除
 
 func request_unpause():
 	_pause_stack = max(0, _pause_stack - 1)
 	if _pause_stack == 0:
 		get_tree().paused = false
-		if enemy_manager and enemy_manager.has_method("start_auto_spawn"):
-			enemy_manager.start_auto_spawn()
+		# auto_spawn功能已移除
 
 func _input(event):
 	if event.is_action_pressed("pause"):
@@ -233,56 +298,8 @@ func _toggle_map() -> void:
 		else:
 			room_manager.show_map()
 
-func _spawn_enemy(spawn_point: Node2D) -> void:
-	if enemy_manager:
-		var enemy_type = "archer"
-		if spawn_point.name.contains("Boar"):
-			enemy_type = "boar"
-			
-		var enemy = enemy_manager.enemy_scenes[enemy_type].instantiate()
-		enemy.global_position = spawn_point.global_position
-		
-		enemy_manager.add_child(enemy)
-		if not enemy in enemy_manager.current_enemies:
-			enemy_manager.current_enemies.append(enemy)
-		
-		if not enemy.defeated.is_connected(enemy_manager._on_enemy_defeated):
-			enemy.defeated.connect(enemy_manager._on_enemy_defeated.bind(enemy))
+# 舊的_spawn_enemy方法已移除 - 現在由EnemyManager的Marker2D系統自動處理
 
-func _on_room_changed():
-	var room_manager = _get_room_manager()
-	if room_manager and room_manager.has_signal("room_changed"):
-		await get_tree().process_frame
-		
-		for node in get_tree().get_nodes_in_group("main"):
-			if node != self:
-				node.remove_from_group("main")
-		if not is_in_group("main"):
-			add_to_group("main")
-		
-		for old_loot_ui in get_tree().get_nodes_in_group("loot_selection_ui"):
-			if old_loot_ui and old_loot_ui.get_parent():
-				old_loot_ui.get_parent().remove_child(old_loot_ui)
-				old_loot_ui.queue_free()
-		
-		var new_loot_selection_ui = loot_selection_ui.instantiate()
-		add_child(new_loot_selection_ui)
-		new_loot_selection_ui.hide()
-		
-		if game_manager:
-			if game_manager.get_parent() != self:
-				if game_manager.get_parent():
-					game_manager.get_parent().remove_child(game_manager)
-				add_child(game_manager)
-			game_manager.name = "game_manager"
-			if not game_manager.is_in_group("game_manager"):
-				game_manager.add_to_group("game_manager")
-		
-		if ui:
-			var current_player = get_tree().get_first_node_in_group("player")
-			if current_player:
-				if ui.has_method("_connect_player"):
-					ui._connect_player()
 
 func _on_player_health_changed(new_health):
 	if ui and game_manager:
@@ -313,4 +330,6 @@ func set_music_volume(volume: float):
 func set_sfx_volume(volume: float):
 	if game_manager:
 		game_manager.set_sfx_volume(volume)
+
+
 #endregion

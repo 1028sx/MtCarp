@@ -1,7 +1,7 @@
 [gd_scene load_steps=72 format=3 uid="uid://f0vch21j7ha6"]
 
 [ext_resource type="Texture2D" uid="uid://c484wxt2fpglx" path="res://assets/rooms/Free-City-Trader-Character-Sprite-Sheets-Pixel-Art/Trader_2/Approval.png" id="1_vihyu"]
-[ext_resource type="Script" path="res://scripts/rooms/trader.gd" id="1_xchf5"]
+[ext_resource type="Script" path="res://scripts/rooms/components/trader.gd" id="1_xchf5"]
 [ext_resource type="Texture2D" uid="uid://wmr1y5lu25as" path="res://assets/rooms/Free-City-Trader-Character-Sprite-Sheets-Pixel-Art/Trader_2/Dialogue.png" id="2_kuf7y"]
 [ext_resource type="Texture2D" uid="uid://cu5a46mbji45e" path="res://assets/rooms/Free-City-Trader-Character-Sprite-Sheets-Pixel-Art/Trader_2/Idle.png" id="3_478us"]
 [ext_resource type="Texture2D" uid="uid://djxhpcg4oob4r" path="res://assets/rooms/Free-City-Trader-Character-Sprite-Sheets-Pixel-Art/Trader_2/Idle_2.png" id="4_fp081"]

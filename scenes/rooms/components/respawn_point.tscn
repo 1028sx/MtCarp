@@ -1,0 +1,72 @@
+[gd_scene load_steps=10 format=3 uid="uid://iy7ptq0tlilt"]
+
+[ext_resource type="Script" path="res://scripts/rooms/components/respawn_point.gd" id="1_1fht8"]
+[ext_resource type="Texture2D" uid="uid://cnr7fwjpgw728" path="res://assets/rooms/spawn_point/activated.png" id="1_eiwit"]
+[ext_resource type="Texture2D" uid="uid://c3g58vighrk3b" path="res://assets/rooms/spawn_point/normal.png" id="2_xe32r"]
+[ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="3_go071"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_j3hjo"]
+size = Vector2(65, 66)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_opwu4"]
+atlas = ExtResource("1_eiwit")
+region = Rect2(0, 0, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_c75md"]
+atlas = ExtResource("2_xe32r")
+region = Rect2(0, 0, 512, 512)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_t62ic"]
+atlas = ExtResource("2_xe32r")
+region = Rect2(0, 0, 512, 512)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_aheqm"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_opwu4")
+}],
+"loop": true,
+"name": &"activated",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_c75md")
+}],
+"loop": false,
+"name": &"activating",
+"speed": 8.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_t62ic")
+}],
+"loop": true,
+"name": &"normal",
+"speed": 5.0
+}]
+
+[node name="RespawnPoint" type="Area2D"]
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("1_1fht8")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0.5, 0)
+shape = SubResource("RectangleShape2D_j3hjo")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+scale = Vector2(0.129883, 0.129883)
+sprite_frames = SubResource("SpriteFrames_aheqm")
+animation = &"normal"
+autoplay = "normal"
+
+[node name="InteractionPrompt" type="Label" parent="."]
+offset_left = -42.0
+offset_top = -52.0
+offset_right = 45.0
+offset_bottom = -38.0
+theme_override_fonts/font = ExtResource("3_go071")
+theme_override_font_sizes/font_size = 12
+text = "S鍵啟動重生點"

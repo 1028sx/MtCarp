@@ -2,10 +2,10 @@ extends Node2D
 
 signal effect_finished
 
-@onready var cast_effect = $CastEffect  # GPUParticles2D
-@onready var bullet_wave_effect = $BulletWaveEffect  # AnimatedSprite2D
-@onready var summon_effect = $SummonEffect  # AnimatedSprite2D
-@onready var shield_effect = $ShieldEffect  # AnimatedSprite2D
+@onready var cast_effect = $CastEffect
+@onready var bullet_wave_effect = $BulletWaveEffect
+@onready var summon_effect = $SummonEffect
+@onready var shield_effect = $ShieldEffect
 
 func _ready():
 	_initialize_effects()

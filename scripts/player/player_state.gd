@@ -6,9 +6,9 @@ var state_machine
 
 var state_name := "PlayerState"
 
-
+#為繼承的狀態覆寫
 func enter() -> void:
-	pass
+	pass 
 
 func exit() -> void:
 	pass

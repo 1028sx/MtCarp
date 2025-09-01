@@ -1,6 +1,6 @@
 [gd_scene load_steps=52 format=3 uid="uid://c1k3ofoijsrqm"]
 
-[ext_resource type="Script" path="res://scripts/enemies/boar.gd" id="1_87fte"]
+[ext_resource type="Script" path="res://scripts/enemies/boar/boar.gd" id="1_87fte"]
 [ext_resource type="Texture2D" uid="uid://corwf1wxiewh0" path="res://assets/enemies/hog/Separated Layer.png" id="2_ucgvp"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_gaw77"]

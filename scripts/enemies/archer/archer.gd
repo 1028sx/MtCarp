@@ -12,7 +12,7 @@ extends "res://scripts/enemies/base/enemy_ai_base.gd"
 #endregion
 
 #region 場景預載
-var arrow_scene = preload("res://scenes/enemies/arrow.tscn")
+var arrow_scene = preload("res://scenes/enemies/archer/arrow.tscn")
 #endregion
 
 #region 狀態變量

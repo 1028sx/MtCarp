@@ -40,6 +40,9 @@ var double_rewards_chance: float = 0.0
 var all_drops_once_enabled: bool = false
 var all_drops_once_used: bool = false
 
+# 重生點數據
+var respawn_data: Dictionary = {}
+
 # 添加統計數據變量
 var play_time := 0.0
 var kill_count := 0
@@ -62,16 +65,11 @@ func _ready():
 	sfx_player = get_node_or_null("SFXPlayer")
 	add_to_group("game_manager")
 	name = "game_manager"
-	
-	# 連接玩家信號
-	# await get_tree().process_frame # No longer needed to wait for player to be in group
-	# var player = get_tree().get_first_node_in_group("player") # Old method
 
 	# 使用 PlayerGlobal 連接玩家信號
-	if PlayerGlobal: # Keep check for Autoload existence for its non-static signals like player_registration_changed
-		if PlayerGlobalScript.is_player_available(): # Call static function on the script resource
-			_connect_to_player_signals(PlayerGlobalScript.get_player()) # Call static function on the script resource
-		# Connect to the signal for when player registration changes
+	if PlayerGlobal:
+		if PlayerGlobalScript.is_player_available():
+			_connect_to_player_signals(PlayerGlobalScript.get_player())
 		if not PlayerGlobal.player_registration_changed.is_connected(_on_player_registration_changed):
 			PlayerGlobal.player_registration_changed.connect(_on_player_registration_changed)
 	
@@ -83,11 +81,16 @@ func _ready():
 			room_manager.room_changed.connect(reset_room_effects)
 
 func _on_player_fully_died_trigger() -> void:
-	if _game_over_initiated: # 如果已經初始化過，直接返回
-		return
-
-	_game_over_initiated = true # 標記為已初始化
-	game_over()
+	# 根據是否有重生點決定後續處理
+	var respawn_manager = get_node_or_null("/root/RespawnManager")
+	if respawn_manager and respawn_manager.has_active_respawn_point():
+		# 有重生點，執行重生
+		respawn_manager.respawn_player()
+	else:
+		# 沒有重生點，執行遊戲結束
+		if not _game_over_initiated:
+			_game_over_initiated = true
+			game_over()
 
 func start_game():
 	current_state = GameState.PLAYING
@@ -162,7 +165,8 @@ func save_game():
 		"level": current_level,
 		"difficulty": current_difficulty,
 		"score": score,
-		"gold": gold
+		"gold": gold,
+		"respawn_data": respawn_data
 	}
 	var file = FileAccess.open("user://savegame.save", FileAccess.WRITE)
 	file.store_var(save_data)
@@ -178,10 +182,16 @@ func load_game():
 			current_difficulty = save_data.get("difficulty", 1)
 			score = save_data.get("score", 0)
 			gold = save_data.get("gold", 0)
+			respawn_data = save_data.get("respawn_data", {})
 			emit_signal("level_changed", current_level)
 			emit_signal("difficulty_changed", current_difficulty)
 			emit_signal("score_changed", score)
 			emit_signal("gold_changed", gold)
+			
+			# 恢復重生點數據
+			var respawn_manager = get_node_or_null("/root/RespawnManager")
+			if respawn_manager:
+				respawn_manager.load_respawn_data()
 			return true
 	return false
 
@@ -236,8 +246,8 @@ func process_loot_effect(effect) -> void:
 		return
 	
 	# 獲取玩家引用
-	# var player = get_tree().get_first_node_in_group("player") # Old method
-	var player = PlayerGlobalScript.get_player() # Call static function on the script resource
+	
+	var player = PlayerGlobalScript.get_player()
 
 	if not player or not player.has_method("apply_effect"):
 		return
@@ -259,6 +269,7 @@ func reset_combo() -> void:
 	current_combo = 0
 
 func game_over() -> void:
+	# 進入遊戲結束邏輯（沒有重生點的情況）
 	get_tree().paused = true
 	current_state = GameState.GAME_OVER
 	
@@ -275,14 +286,14 @@ func game_over() -> void:
 	# 實例化並顯示 GameOverScreen
 	if not is_instance_valid(game_over_screen_instance):
 		game_over_screen_instance = GameOverScreenScene.instantiate()
-		var main_scene = get_tree().root.get_node_or_null("Main") # Adjust path if your main scene is named differently or elsewhere
+		var main_scene = get_tree().root.get_node_or_null("Main")
 		if main_scene:
 			main_scene.add_child(game_over_screen_instance)
 		else:
-			get_tree().root.add_child(game_over_screen_instance) # Fallback to root
+			get_tree().root.add_child(game_over_screen_instance)
 
 	if is_instance_valid(game_over_screen_instance):
-		if not game_over_screen_instance.is_inside_tree(): # Ensure it's in the tree
+		if not game_over_screen_instance.is_inside_tree():
 			var main_scene = get_tree().root.get_node_or_null("Main")
 			if main_scene:
 				main_scene.add_child(game_over_screen_instance)
@@ -291,7 +302,7 @@ func game_over() -> void:
 		
 		game_over_screen_instance.show_screen()
 
-# 新增一個函數來處理玩家信號連接
+# 玩家信號連接函數
 func _connect_to_player_signals(player_node: CharacterBody2D) -> void:
 	if is_instance_valid(player_node):
 		# 斷開舊的 died 信號連接 (如果存在且已連接到舊的處理函數)
@@ -301,24 +312,19 @@ func _connect_to_player_signals(player_node: CharacterBody2D) -> void:
 		# 連接 player_fully_died 信號
 		if player_node.has_signal("player_fully_died"):
 			if player_node.player_fully_died.is_connected(_on_player_fully_died_trigger):
-				# 如果 Godot 說已經連接了，那我們就相信它，並確保我們的標誌也是 true
 				if not _is_player_fully_died_signal_connected:
 					_is_player_fully_died_signal_connected = true
 			else:
-				# Godot 說沒有連接，所以我們嘗試連接
 				var error_code = player_node.player_fully_died.connect(_on_player_fully_died_trigger)
 				if error_code == OK:
 					_is_player_fully_died_signal_connected = true
 				else:
-					_is_player_fully_died_signal_connected = false # 確保標誌正確
-		
-		# 連接玩家血量變化信號 (如果需要)
-		# if player_node.has_signal("health_changed"):
-		# ... existing code ...
+					_is_player_fully_died_signal_connected = false
+
 
 func _on_player_registration_changed(is_registered: bool) -> void:
 	if is_registered:
-		var player_node = PlayerGlobalScript.get_player() # Call static function on the script resource
+		var player_node = PlayerGlobalScript.get_player()
 		if is_instance_valid(player_node):
 			_connect_to_player_signals(player_node)
 	else:
@@ -328,7 +334,7 @@ func _on_player_registration_changed(is_registered: bool) -> void:
 		# 當玩家註銷時（例如返回主選單或重新開始關卡），重置 game_over_initiated 標誌
 		_game_over_initiated = false 
 		
-		cleanup_game_over_screen() # ADDED: Clean up GameOverScreen when player unregisters
+		cleanup_game_over_screen()
 
 func reset_game() -> void:
 	play_time = 0.0
@@ -342,12 +348,14 @@ func reset_room_effects() -> void:
 	if all_drops_once_enabled and all_drops_once_used:
 		all_drops_once_used = false
 
-func show_temporary_message(_message: String, _duration: float = 2.0) -> void: # 將未使用的參數加上底線
-	pass # ADDED pass to fix indentation error
-	# ... existing code ...
-
-# ADDED: Function to clean up the GameOverScreen instance
 func cleanup_game_over_screen() -> void:
 	if is_instance_valid(game_over_screen_instance):
 		game_over_screen_instance.queue_free()
 		game_over_screen_instance = null
+
+# 重生點數據管理
+func set_respawn_data(data: Dictionary) -> void:
+	respawn_data = data
+
+func get_respawn_data() -> Dictionary:
+	return respawn_data

@@ -1,8 +1,7 @@
-[gd_scene load_steps=7 format=3 uid="uid://dupyi4to1435b"]
+[gd_scene load_steps=6 format=3 uid="uid://dupyi4to1435b"]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_vwedp"]
 [ext_resource type="PackedScene" uid="uid://b2q5462bdb0q2" path="res://scenes/player/player.tscn" id="2_65yxm"]
-[ext_resource type="PackedScene" uid="uid://b3r7qpb7qqyqr" path="res://scenes/managers/enemy_manager.tscn" id="3_ekfjl"]
 [ext_resource type="PackedScene" uid="uid://4wmx6pcc3vg0" path="res://scenes/managers/item_manager.tscn" id="4_hg2ct"]
 [ext_resource type="PackedScene" uid="uid://docm2db81k064" path="res://scenes/ui/ui.tscn" id="6_r5clf"]
 [ext_resource type="PackedScene" uid="uid://h3xx5f835571" path="res://scenes/managers/game_manager.tscn" id="7_y63d1"]
@@ -11,14 +10,11 @@
 script = ExtResource("1_vwedp")
 
 [node name="Player" parent="." instance=ExtResource("2_65yxm")]
-visible = false
 
 [node name="Camera2D" type="Camera2D" parent="Player"]
-zoom = Vector2(2, 2)
+zoom = Vector2(2.5, 2.5)
 limit_smoothed = true
 position_smoothing_enabled = true
-
-[node name="EnemyManager" parent="." instance=ExtResource("3_ekfjl")]
 
 [node name="ItemManager" parent="." instance=ExtResource("4_hg2ct")]
 

@@ -4,15 +4,12 @@ extends Node2D
 @export var item_scenes = {
 	"word": preload("res://scenes/items/word.tscn"),
 	"loot": preload("res://scenes/ui/loot.tscn"),
-	# 暫時註釋掉尚未實現的道具
 	# "health_potion": preload("res://scenes/items/HealthPotion.tscn"),
 	# "speed_boost": preload("res://scenes/items/SpeedBoost.tscn"),
 	# "damage_up": preload("res://scenes/items/DamageUp.tscn")
 }
 
 # 信號
-# 暫時註釋掉未使用的信號
-# signal item_collected(item_type: String)
 
 # 當前房間的道具列表
 var current_items = []
@@ -47,11 +44,9 @@ func spawn_items_for_room(room: Node2D, difficulty: int):
 			item.connect("collected", Callable(self, "_on_item_collected"))
 
 func calculate_num_items(difficulty: int) -> int:
-	# 修改計算邏輯以避免整數除法警告
-	return max(1, int(difficulty / 2.0))  # 使用浮點數除法
+	return max(1, int(difficulty / 2.0))
 
 func choose_item_type(_difficulty: int) -> String:
-	# 添加下劃線以表示未使用的參數
 	if item_scenes.is_empty():
 		return ""
 	var available_items = item_scenes.keys()
@@ -75,11 +70,11 @@ func _on_item_collected(item):
 func apply_item_effect(item_type: String, player: CharacterBody2D):
 	match item_type:
 		"health_potion":
-			player.heal(20)  # 假設恢復20點生命值
+			player.heal(20)
 		"speed_boost":
-			player.apply_speed_boost(1.5, 10.0)  # 假設增加50%速度，持續10秒
+			player.apply_speed_boost(1.5, 10.0)
 		"damage_up":
-			player.increase_damage(5)  # 假設增加5點傷害
+			player.increase_damage(5)
 
 func _process(_delta):
 	# 移除無效的道具引用
