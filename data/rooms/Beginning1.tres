@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="RoomData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/rooms/room_data.gd" id="1_joqu6"]
+
+[resource]
+script = ExtResource("1_joqu6")
+room_name = "Beginning1"
+room_size = Vector2(1920, 1080)
+camera_bounds = Rect2(0, 0, 1920, 1080)
+spawn_points = {
+"BottomSpawn": Vector2(960, 980),
+"DefaultSpawn": Vector2(960, 540),
+"LeftSpawn": Vector2(100, 540),
+"RightSpawn": Vector2(1820, 540),
+"TopSpawn": Vector2(960, 100)
+}
+connections = {
+"right": "Beginning2"
+}
+room_type = "NORMAL"
+requires_clear_to_exit = false
+enemy_count = 0
+background_music = ""
+ambient_sound = ""
+lighting_preset = "default"
