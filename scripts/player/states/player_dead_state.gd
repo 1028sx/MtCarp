@@ -12,7 +12,7 @@ func enter() -> void:
 	player.velocity = Vector2.ZERO
 	death_animation_finished = false
 	
-	# 檢查復活心邏輯
+	# 檢查復活之心
 	if player.has_revive_heart:
 		_handle_revive_heart()
 		return
@@ -60,22 +60,16 @@ func _trigger_death_completion():
 	death_animation_finished = true
 	death_animation_truly_finished.emit()
 	
-	# 根據是否有重生點決定後續處理
-	if has_respawn_point:
-		# 有重生點：TransitionScreen 淡出已經開始，直接發信號重生
-		player.player_fully_died.emit()
-	else:
-		# 沒有重生點：執行玩家淡出效果，完成後發信號進入 Game Over
+	# 根據是否有重生點決定視覺效果
+	if not has_respawn_point:
+		# 沒有重生點：執行玩家淡出效果
 		var tween = player.create_tween()
 		tween.tween_property(player, "modulate", Color(1, 1, 1, 0), 2.0)
 		tween.tween_callback(func(): 
 			player.visible = false
-			player.player_fully_died.emit()
 		)
 
 func exit() -> void:
-	# 碰撞設定由編輯器處理，不在腳本中設定
-	# 視覺效果重置由 reset_state() 處理，避免重複
 	if player.animated_sprite:
 		player.animated_sprite.speed_scale = 1.0
 
@@ -88,7 +82,7 @@ func process_input(_event: InputEvent) -> void:
 func get_transition() -> PlayerState:
 	return null
 
-# 處理復活心邏輯
+# 處理復活之心
 func _handle_revive_heart() -> void:
 	player.has_revive_heart = false
 	player.current_health = float(player.max_health) / 2.0
@@ -114,7 +108,7 @@ func _check_respawn_point() -> void:
 	if respawn_manager and respawn_manager.has_active_respawn_point():
 		has_respawn_point = true
 		
-		# 立即開始 TransitionScreen 淡出（0.5秒）
+		# TransitionScreen 淡出
 		var transition_screen = player.get_node_or_null("/root/TransitionScreen")
 		if transition_screen and transition_screen.has_method("fade_to_black"):
 			transition_screen.fade_to_black()

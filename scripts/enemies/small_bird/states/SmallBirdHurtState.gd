@@ -2,6 +2,13 @@ extends EnemyHurtState
 
 class_name SmallBirdHurtState
 
+func on_enter() -> void:
+	super.on_enter()
+	
+	# 重置角度
+	if is_instance_valid(owner.animated_sprite):
+		owner.animated_sprite.rotation_degrees = 0
+
 func on_animation_finished() -> void:
-	# 返回巡邏狀態， क्योंकि 飛行單位沒有真正的「待機」
-	transition_to("Patrol") 
+	# 返回地面巡邏狀態
+	transition_to("GroundPatrol") 

@@ -1,0 +1,39 @@
+{
+	"mapdata_path": "res://scenes/rooms/MapData.txt",
+	"color_mappings": {
+		"24d6da,,,,": {
+			"area_name": "Beginning",
+			"folder": "beginning",
+			"prefix": "Beginning"
+		},
+		"4be021,,,,": {
+			"area_name": "Jungle",
+			"folder": "jungle",
+			"prefix": "Jungle"
+		},
+		"e4b015,,,,": {
+			"area_name": "Fortress",
+			"folder": "fortress",
+			"prefix": "Fortress"
+		},
+		"e04a21,,,,": {
+			"area_name": "Village",
+			"folder": "village",
+			"prefix": "Village"
+		},
+		"8b15e4,,,,": {
+			"area_name": "Mountain",
+			"folder": "mountain",
+			"prefix": "Mountain"
+		}
+	},
+	"tileset_path": "",
+	"selected_tiles": [0, 1, 2, 3],
+	"room_template": "",
+	"included_nodes": ["RoomInstance", "DeathZone"],
+	"generation_settings": {
+		"create_spawn_points": true,
+		"create_room_boundaries": true,
+		"tile_size": 32
+	}
+}

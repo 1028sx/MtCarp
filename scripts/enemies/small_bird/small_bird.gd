@@ -13,7 +13,7 @@ extends "res://scripts/enemies/base/flying_enemy_base.gd"
 
 # 獲取當前活動的攻擊區域
 func get_current_attack_area() -> Area2D:
-	# 根據精靈的翻轉狀態選擇正確的攻擊區域
+	# 根據翻轉狀態選擇正確的攻擊區域
 	if animated_sprite and animated_sprite.flip_h:
 		return attack_area_left
 	else:
@@ -49,10 +49,10 @@ func _ready() -> void:
 	# 重新指向SmallBird特定的攻擊冷卻計時器節點
 	attack_cooldown_timer = $AttackCooldownTimer
 	if attack_cooldown_timer:
-		attack_cooldown_timer.wait_time = 2.0  # 2秒攻擊冷卻
+		attack_cooldown_timer.wait_time = 2.0
 		attack_cooldown_timer.one_shot = true
 	
-	change_state("Patrol")
+	change_state("GroundPatrol")
 
 
 func set_collision_shape_state() -> void:
@@ -77,11 +77,12 @@ func set_collision_shape_state() -> void:
 
 func _initialize_states() -> void:
 	"""初始化並註冊所有狀態。"""
-	add_state("Patrol", SmallBirdPatrolState.new())
-	add_state("Chase", SmallBirdChaseState.new())
-	add_state("Attack", SmallBirdAttackState.new())
+	add_state("GroundPatrol", SmallBirdGroundPatrolState.new())
+	add_state("Takeoff", SmallBirdTakeoffState.new())
+	add_state("Landing", SmallBirdLandingState.new())
+	add_state("AirCombat", SmallBirdAirCombatState.new())
 	add_state("Hurt", SmallBirdHurtState.new())
-	add_state("Dead", EnemyDeadState.new()) # DeadState 是通用的，已經有 class_name
+	add_state("Dead", EnemyDeadState.new())
 
 
 #region 動畫名稱覆寫
@@ -97,19 +98,14 @@ func _get_takeoff_animation() -> String: return "takeoff"
 func _get_land_animation() -> String: return "land"
 #endregion
 
-# region 狀態切換邏輯
 
 func _on_detection_area_body_entered(body: Node) -> void:
 	super._on_detection_area_body_entered(body)
-	if current_state_name in ["Patrol", "Idle"]:
-		change_state("Chase")
+	# 讓當前狀態自己處理玩家檢測
 
 func _on_detection_area_body_exited(body: Node) -> void:
 	super._on_detection_area_body_exited(body)
-	if current_state_name == "Chase":
-		change_state("Patrol")
-
-# endregion
+	# 讓當前狀態自己處理玩家離開
 
 
 func take_damage(amount: float, _attacker: Node) -> void:
@@ -143,4 +139,9 @@ func _on_animation_frame_changed() -> void:
 	# 將動畫幀變化事件轉發給當前狀態
 	if current_state and current_state.has_method("on_animation_frame_changed"):
 		current_state.on_animation_frame_changed(animated_sprite.frame)
+
+func _on_animation_finished() -> void:
+	# 將動畫完成事件轉發給當前狀態
+	if current_state and current_state.has_method("on_animation_finished"):
+		current_state.on_animation_finished()
 #endregion

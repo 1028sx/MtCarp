@@ -1,4 +1,4 @@
-[gd_scene load_steps=210 format=3 uid="uid://b2q5462bdb0q2"]
+[gd_scene load_steps=211 format=3 uid="uid://b2q5462bdb0q2"]
 
 [ext_resource type="Script" path="res://scripts/player/player.gd" id="1_b51by"]
 [ext_resource type="Texture2D" uid="uid://cyr1632llp4qs" path="res://assets/players/Sprites/DASH.png" id="2_egfxe"]
@@ -35,6 +35,7 @@
 [ext_resource type="Script" path="res://scripts/player/states/player_hurt_state.gd" id="34_pa3c0"]
 [ext_resource type="Script" path="res://scripts/player/states/player_wall_slide_state.gd" id="35_h76fr"]
 [ext_resource type="Script" path="res://scripts/player/states/player_ground_slam_state.gd" id="36_bu6a7"]
+[ext_resource type="Script" path="res://scripts/player/states/player_healing_state.gd" id="36_d6nan"]
 [ext_resource type="Script" path="res://scripts/player/states/player_dead_state.gd" id="37_d38xp"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_pwo0r"]
@@ -1488,6 +1489,9 @@ script = ExtResource("36_bu6a7")
 
 [node name="Dead" type="Node" parent="StateMachine"]
 script = ExtResource("37_d38xp")
+
+[node name="Healing" type="Node" parent="StateMachine"]
+script = ExtResource("36_d6nan")
 
 [node name="MetroidvaniaSystem" type="Node" parent="."]
 script = ExtResource("27_vq02x")

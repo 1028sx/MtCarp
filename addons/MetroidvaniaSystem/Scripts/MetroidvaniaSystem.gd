@@ -78,11 +78,16 @@ func _enter_tree() -> void:
 		settings.theme = load("res://addons/MetroidvaniaSystem/Themes/Exquisite/Theme.tres")
 		ResourceSaver.save(settings, settings_path)
 	
-	settings.theme_changed.connect(_update_theme)
+	if not settings.theme_changed.is_connected(_update_theme):
+		settings.theme_changed.connect(_update_theme)
 	_update_theme()
 	
 	map_data = MapData.new()
 	map_data.load_data()
+
+func _exit_tree() -> void:
+	if settings and settings.theme_changed.is_connected(_update_theme):
+		settings.theme_changed.disconnect(_update_theme)
 
 func _update_theme():
 	CELL_SIZE = settings.theme.center_texture.get_size()

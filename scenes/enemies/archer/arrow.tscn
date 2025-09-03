@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://c6g8qj0175iik"]
+[gd_scene load_steps=5 format=3 uid="uid://c6g8qj0175iik"]
 
 [ext_resource type="Script" path="res://scripts/enemies/archer/arrow.gd" id="1_28do3"]
 [ext_resource type="Texture2D" uid="uid://d1tpk27450c3c" path="res://assets/enemies/archer/arrow.png" id="1_vufk6"]
@@ -12,8 +12,8 @@ radius = 3.0
 height = 60.0
 
 [node name="Arrow" type="CharacterBody2D"]
-collision_layer = 64
-collision_mask = 9
+collision_layer = 0
+collision_mask = 3
 script = ExtResource("1_28do3")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
@@ -25,8 +25,8 @@ rotation = 1.5708
 shape = SubResource("CapsuleShape2D_w5qsd")
 
 [node name="HitBox" type="Area2D" parent="."]
-collision_layer = 64
-collision_mask = 8
+collision_layer = 8
+collision_mask = 4
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="HitBox"]
 rotation = 1.5708

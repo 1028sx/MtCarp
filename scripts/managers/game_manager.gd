@@ -1,6 +1,5 @@
 extends Node
 
-# Preload the PlayerGlobal script resource to call static functions from the type
 const PlayerGlobalScript = preload("res://scripts/globals/PlayerGlobal.gd")
 
 # 遊戲狀態
@@ -18,10 +17,10 @@ var music_volume = 1.0
 var sfx_volume = 1.0
 
 # 信號
-signal difficulty_changed(new_difficulty)
-signal score_changed(new_score)
-signal gold_changed(new_gold)
-signal level_changed(new_level)
+#signal difficulty_changed(new_difficulty)
+#signal score_changed(new_score)
+#signal gold_changed(new_gold)
+#signal level_changed(new_level)
 
 # 音頻播放器引用
 var music_player: AudioStreamPlayer
@@ -84,6 +83,8 @@ func _on_player_fully_died_trigger() -> void:
 	# 根據是否有重生點決定後續處理
 	var respawn_manager = get_node_or_null("/root/RespawnManager")
 	if respawn_manager and respawn_manager.has_active_respawn_point():
+		# 延遲0.5秒確保轉場和狀態完全清理
+		await get_tree().create_timer(0.5).timeout
 		# 有重生點，執行重生
 		respawn_manager.respawn_player()
 	else:
@@ -160,39 +161,54 @@ func load_settings():
 			set_music_volume(settings.get("music_volume", 1.0))
 			set_sfx_volume(settings.get("sfx_volume", 1.0))
 
-func save_game():
-	var save_data = {
+# 為MetSys SaveManager提供數據
+func get_save_data() -> Dictionary:
+	return {
 		"level": current_level,
 		"difficulty": current_difficulty,
 		"score": score,
 		"gold": gold,
+		"play_time": play_time,
+		"kill_count": kill_count,
+		"max_combo": max_combo,
+		"current_combo": current_combo,
+		"double_rewards_chance": double_rewards_chance,
+		"all_drops_once_enabled": all_drops_once_enabled,
+		"all_drops_once_used": all_drops_once_used,
 		"respawn_data": respawn_data
 	}
-	var file = FileAccess.open("user://savegame.save", FileAccess.WRITE)
-	file.store_var(save_data)
-	file.close()
 
+func set_save_data(data: Dictionary):
+	current_level = data.get("level", 1)
+	current_difficulty = data.get("difficulty", 1)
+	score = data.get("score", 0)
+	gold = data.get("gold", 0)
+	play_time = data.get("play_time", 0.0)
+	kill_count = data.get("kill_count", 0)
+	max_combo = data.get("max_combo", 0)
+	current_combo = data.get("current_combo", 0)
+	double_rewards_chance = data.get("double_rewards_chance", 0.0)
+	all_drops_once_enabled = data.get("all_drops_once_enabled", false)
+	all_drops_once_used = data.get("all_drops_once_used", false)
+	respawn_data = data.get("respawn_data", {})
+	
+	# 發出信號通知UI更新
+	emit_signal("level_changed", current_level)
+	emit_signal("difficulty_changed", current_difficulty)
+	emit_signal("score_changed", score)
+	emit_signal("gold_changed", gold)
+	
+	# 恢復重生點數據
+	var respawn_manager = get_node_or_null("/root/RespawnManager")
+	if respawn_manager and respawn_manager.has_method("load_respawn_data"):
+		respawn_manager.load_respawn_data()
+
+# 保留舊的方法作為後備（可能被其他地方調用）
+func save_game():
+	print("GameManager: 使用舊的save_game方法，建議使用MetSys SaveManager")
+	
 func load_game():
-	if FileAccess.file_exists("user://savegame.save"):
-		var file = FileAccess.open("user://savegame.save", FileAccess.READ)
-		var save_data = file.get_var()
-		file.close()
-		if save_data:
-			current_level = save_data.get("level", 1)
-			current_difficulty = save_data.get("difficulty", 1)
-			score = save_data.get("score", 0)
-			gold = save_data.get("gold", 0)
-			respawn_data = save_data.get("respawn_data", {})
-			emit_signal("level_changed", current_level)
-			emit_signal("difficulty_changed", current_difficulty)
-			emit_signal("score_changed", score)
-			emit_signal("gold_changed", gold)
-			
-			# 恢復重生點數據
-			var respawn_manager = get_node_or_null("/root/RespawnManager")
-			if respawn_manager:
-				respawn_manager.load_respawn_data()
-			return true
+	print("GameManager: 使用舊的load_game方法，建議使用MetSys SaveManager")
 	return false
 
 func play_sound(sound_name: String):

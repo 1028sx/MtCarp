@@ -15,7 +15,7 @@ signal defeated
 @export_group("AI 行為")
 @export var detection_range: float = 200.0
 @export var attack_range: float = 50.0
-@export var attack_cooldown: float = 2.0
+@export var attack_cooldown: float = 0.8
 @export var wander_time_min: float = 2.0
 @export var wander_time_max: float = 4.0
 
@@ -89,6 +89,10 @@ func change_state(new_state_name: String) -> void:
 
 	if current_state:
 		current_state.on_exit()
+	
+	# 記錄上一個狀態 (為FlyingEnemyBase子類使用)
+	if has_method("set_last_state"):
+		call("set_last_state", current_state_name)
 	
 	current_state_name = new_state_name
 	current_state = states[new_state_name]

@@ -16,7 +16,7 @@ func on_enter() -> void:
 func process_physics(delta: float) -> void:
 	super.process_physics(delta)
 	
-	# 在空中時，依然可以有水平控制，以追向玩家 (已更新為使用 PlayerGlobal)
+	# 在空中時，依然可以有水平控制，以追向玩家
 	if PlayerGlobalScript.is_player_available():
 		var player = PlayerGlobalScript.get_player()
 		var direction_to_player = owner.global_position.direction_to(player.global_position)
@@ -26,7 +26,7 @@ func process_physics(delta: float) -> void:
 
 	# 當回到地面時，結束這個狀態
 	if owner.is_on_floor():
-		# 根據玩家是否存在來決定下一個狀態 (已更新為使用 PlayerGlobal)
+		# 根據玩家是否存在來決定下一個狀態
 		if PlayerGlobalScript.is_player_available():
 			owner.change_state("Chase")
 		else:
@@ -34,7 +34,4 @@ func process_physics(delta: float) -> void:
 
 func on_exit() -> void:
 	super.on_exit()
-	# 恢復正常的重力
 	owner.gravity_scale = NORMAL_GRAVITY_SCALE
-	# 可選：在落地時播放一個落地動畫
-	# owner.animated_sprite.play("land") 

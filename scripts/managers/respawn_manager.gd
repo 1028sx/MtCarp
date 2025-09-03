@@ -64,62 +64,83 @@ func get_respawn_room() -> String:
 	return respawn_room
 
 func has_active_respawn_point() -> bool:
-	return active_respawn_point != null and is_instance_valid(active_respawn_point)
+	# 先檢查當前節點是否有效
+	if active_respawn_point != null and is_instance_valid(active_respawn_point):
+		return true
+	
+	# 如果節點無效，檢查是否有保存的重生數據
+	return respawn_position != Vector2.ZERO and respawn_room != "" and respawn_room != "Unknown"
+
+# 添加重生鎖定機制防止無限循環
+var _respawn_in_progress: bool = false
 
 func respawn_player() -> void:
+	# 防止重複觸發重生流程
+	if _respawn_in_progress:
+		return
+	_respawn_in_progress = true
+	
 	if not has_active_respawn_point():
+		_respawn_in_progress = false
 		push_warning("RespawnManager: 沒有活躍的重生點")
 		return
 	
 	var player = get_tree().get_first_node_in_group("player")
 	if not player:
+		_respawn_in_progress = false
 		push_error("RespawnManager: 找不到玩家")
 		return
 	
 	# 獲取重生位置和房間
 	var spawn_pos = get_respawn_position()
 	var spawn_room = get_respawn_room()
+	var current_room = MetSys.get_current_room_name() if MetSys else ""
 	
-	# 檢查是否需要切換房間
-	var current_room = ""
-	if get_node_or_null("/root/MetSys"):
-		var metsys = get_node("/root/MetSys")
-		if metsys.has_method("get_current_room_name"):
-			current_room = metsys.get_current_room_name()
-	
+	# 根據重生位置執行相應邏輯
 	if current_room != spawn_room and spawn_room != "" and spawn_room != "Unknown":
-		# 需要切換到重生點所在的房間
-		_respawn_in_different_room(spawn_room, spawn_pos)
+		await _respawn_in_different_room(spawn_room, spawn_pos)
 	else:
-		# 在當前房間重生
 		_respawn_in_current_room(player, spawn_pos)
+		var transition_screen = get_node_or_null("/root/TransitionScreen")
+		if transition_screen and transition_screen.has_method("fade_from_black"):
+			transition_screen.fade_from_black()
 	
-	# 立即開始淡入
-	var transition_screen = get_node_or_null("/root/TransitionScreen")
-	if transition_screen and transition_screen.has_method("fade_from_black"):
-		transition_screen.fade_from_black()
+	_respawn_in_progress = false
 
 func _respawn_in_current_room(player: Node, position: Vector2) -> void:
-	# 強制重置物理狀態
+	# 重置玩家狀態
 	player.velocity = Vector2.ZERO
-	
-	# 設置重生位置
 	player.global_position = position
+	
+	# 恢復玩家可見性
+	player.visible = true
+	player.modulate = Color.WHITE
 	
 	# 等待一幀確保物理更新
 	await get_tree().process_frame
 	
 	# 重置玩家狀態
-	if player.has_method("reset_state"):
-		player.reset_state()
+	if player.has_method("reset_all_states"):
+		player.reset_all_states()
 	
 	if player.has_method("restore_health"):
 		player.restore_health()
 	
+	# 強制狀態機轉換到 idle 狀態
+	if player.has_method("get") and player.get("state_machine"):
+		var state_machine = player.state_machine
+		if state_machine and state_machine.has_method("_transition_to"):
+			if state_machine.states.has("idle"):
+				state_machine._transition_to(state_machine.states["idle"])
+	
+	# 確保物理和輸入處理重新啟用
+	player.set_physics_process(true)
+	player.set_process_input(true)
+	
 	# 確保玩家不在牆內 - 如果在牆內則向上移動
 	var space_state = get_tree().root.world_2d.direct_space_state
 	var query = PhysicsRayQueryParameters2D.create(position, position + Vector2(0, -64))
-	query.collision_mask = 1  # 只檢測環境碰撞層
+	query.collision_mask = 1
 	var result = space_state.intersect_ray(query)
 	if result:
 		# 如果上方有碰撞，嘗試向上調整位置
@@ -137,34 +158,29 @@ func _respawn_in_current_room(player: Node, position: Vector2) -> void:
 	player_respawned.emit(position)
 
 func _respawn_in_different_room(room_name: String, position: Vector2) -> void:
-	# 設定重生標記，讓新場景知道要在重生點位置生成玩家
-	set_meta("pending_respawn", true)
-	set_meta("respawn_position", position)
-	
-	# 通過 MetSys 切換房間
-	if get_node_or_null("/root/MetSys"):
-		var metsys = get_node("/root/MetSys")
-		if metsys.has_method("change_room"):
-			metsys.change_room(room_name)
-		else:
-			push_error("RespawnManager: MetSys 沒有 change_room 方法")
-	
-	# 延遲處理重生
-	await get_tree().create_timer(0.1).timeout
-	_complete_respawn_after_room_change()
-
-func _complete_respawn_after_room_change() -> void:
-	if not has_meta("pending_respawn"):
+	# 直接載入目標房間
+	var main = get_tree().get_first_node_in_group("main")
+	if not main or not main.has_method("load_room"):
+		push_error("RespawnManager: 找不到Main節點或load_room方法")
 		return
 	
+	await main.load_room(room_name)
+	
+	# 設置玩家重生狀態
 	var player = get_tree().get_first_node_in_group("player")
 	if player:
-		var spawn_pos = get_meta("respawn_position", Vector2.ZERO)
-		_respawn_in_current_room(player, spawn_pos)
+		_respawn_in_current_room(player, position)
+		
+		# 同步MetSys狀態
+		await get_tree().process_frame
+		if MetSys:
+			MetSys.set_player_position(position)
 	
-	# 清理元數據
-	remove_meta("pending_respawn")
-	remove_meta("respawn_position")
+	# 淡入效果
+	var transition_screen = get_node_or_null("/root/TransitionScreen")
+	if transition_screen and transition_screen.has_method("fade_from_black"):
+		transition_screen.fade_from_black()
+
 
 func save_respawn_data() -> void:
 	var save_data = {
@@ -197,3 +213,15 @@ func clear_all_respawn_points() -> void:
 	active_respawn_point = null
 	respawn_position = Vector2.ZERO
 	respawn_room = ""
+
+# 為MetSys SaveManager提供數據
+func get_save_data() -> Dictionary:
+	return {
+		"respawn_position": respawn_position,
+		"respawn_room": respawn_room,
+		"has_active_point": has_active_respawn_point()
+	}
+
+func set_save_data(data: Dictionary):
+	respawn_position = data.get("respawn_position", Vector2.ZERO)
+	respawn_room = data.get("respawn_room", "")

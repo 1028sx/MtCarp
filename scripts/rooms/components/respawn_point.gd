@@ -14,10 +14,6 @@ var fade_tween: Tween
 func _ready() -> void:
 	add_to_group("respawn_points")
 	
-	# 設定碰撞層
-	collision_layer = 0
-	collision_mask = 2  # 玩家層
-	
 	# 連接信號
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
@@ -26,10 +22,13 @@ func _ready() -> void:
 	_setup_visual_state()
 	_setup_interaction_prompt()
 	
-	# 向重生管理器註冊
+	# 向重生管理器註冊並檢查是否應該是活躍狀態
 	var respawn_manager = get_node_or_null("/root/RespawnManager")
 	if respawn_manager:
 		respawn_manager.register_respawn_point(self)
+		
+		# 檢查當前重生點是否應該是活躍的
+		_check_if_should_be_active(respawn_manager)
 
 func _setup_visual_state() -> void:
 	if animated_sprite:
@@ -44,6 +43,21 @@ func _setup_interaction_prompt() -> void:
 		interaction_prompt.modulate.a = 0.0
 		interaction_prompt.visible = false
 
+func _check_if_should_be_active(respawn_manager) -> void:
+	# 檢查這個重生點是否是當前活躍的重生點
+	if respawn_manager.has_active_respawn_point():
+		var current_room = get_room_name()
+		var current_position = global_position
+		
+		# 比較當前重生點的房間和位置
+		var active_room = respawn_manager.get_respawn_room()
+		var active_position = respawn_manager.get_respawn_position()
+		
+		# 如果房間匹配且位置接近，則應該是活躍狀態
+		if current_room == active_room and current_position.distance_to(active_position) < 50.0:
+			is_activated = true
+			_setup_visual_state()  # 重新設置視覺狀態
+
 func _input(event: InputEvent) -> void:
 	if can_interact and not is_activated:
 		if event.is_action_pressed("interact"):
@@ -54,11 +68,19 @@ func _on_body_entered(body: Node2D) -> void:
 		can_interact = true
 		if not is_activated:
 			_show_interaction_prompt()
+		
+		# 儲存玩家引用用於治療請求
+		if not has_meta("current_player"):
+			set_meta("current_player", body)
 
 func _on_body_exited(body: Node2D) -> void:
 	if body.is_in_group("player"):
 		can_interact = false
 		_hide_interaction_prompt()
+		
+		# 清除玩家引用
+		if has_meta("current_player"):
+			remove_meta("current_player")
 
 func _show_interaction_prompt() -> void:
 	if interaction_prompt and not is_activated:
@@ -87,24 +109,13 @@ func _activate_respawn_point() -> void:
 	if is_activated:
 		return
 	
-	# 獲取玩家引用
-	var player = get_tree().get_first_node_in_group("player")
-	if player:
-		# 播放 healing 動畫
-		if player.has_node("AniSprite2D"):
-			var player_sprite = player.get_node("AniSprite2D")
-			if player_sprite and player_sprite.sprite_frames and player_sprite.sprite_frames.has_animation("healing"):
-				player_sprite.play("healing")
-				# 等待動畫播放完成
-				await player_sprite.animation_finished
-				# 恢復到 idle 動畫
-				player_sprite.play("idle")
-		
-		# 恢復滿血
-		if player.has_method("restore_health"):
-			player.restore_health()
+	# 直接呼叫玩家的治療方法
+	if has_meta("current_player"):
+		var player_body = get_meta("current_player")
+		if player_body and player_body.has_method("start_healing"):
+			player_body.start_healing("respawn_point")
 	
-	# 設定為激活狀態
+	# 設定為啟動狀態
 	is_activated = true
 	_setup_visual_state()
 	_hide_interaction_prompt()
@@ -116,7 +127,6 @@ func _activate_respawn_point() -> void:
 			await animated_sprite.animation_finished
 		animated_sprite.play("activated")
 	
-	# 發出激活信號
 	activated.emit(self)
 	
 	# 通知重生管理器
@@ -138,20 +148,22 @@ func deactivate() -> void:
 func get_respawn_position() -> Vector2:
 	# 調整重生位置，避免玩家重生在地面以下
 	var spawn_pos = global_position
-	spawn_pos.y -= 32  # 向上偏移32像素，確保玩家重生在地面上方
+	spawn_pos.y -= 32  # 確保玩家重生在地面上方
 	return spawn_pos
 
 func get_room_name() -> String:
-	# 嘗試從父節點獲取房間名稱
+	# 優先使用 MetSys 獲取正確的房間名稱格式（包含路徑和副檔名）
+	var metsys = get_node_or_null("/root/MetSys")
+	if metsys and metsys.has_method("get_current_room_name"):
+		var room_name = metsys.get_current_room_name()
+		if room_name != "":
+			return room_name
+	
+	# 後備方案：從父節點獲取房間名稱
 	var room_node = get_parent()
 	while room_node:
 		if room_node.name.begins_with("Room") or room_node.name.begins_with("Beginning"):
 			return room_node.name
 		room_node = room_node.get_parent()
-	
-	# 如果找不到，使用 MetSys 獲取當前房間
-	var metsys = get_node_or_null("/root/MetSys")
-	if metsys and metsys.has_method("get_current_room_name"):
-		return metsys.get_current_room_name()
 	
 	return "Unknown"

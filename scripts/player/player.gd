@@ -974,6 +974,15 @@ func restore_health() -> void:
 	if player_effect_manager:
 		player_effect_manager.play_heal_effect()
 
+func start_healing(source: String = "respawn_point") -> void:
+	if state_machine and state_machine.states.has("healing"):
+		var healing_state = state_machine.states["healing"]
+		if healing_state and healing_state.has_method("set_healing_source"):
+			healing_state.set_healing_source(source)
+		state_machine._transition_to(healing_state)
+		# 恢復血量
+		restore_health()
+
 func restore_lives() -> void:
 	has_revive_heart = true
 	var ui = get_tree().get_first_node_in_group("ui")

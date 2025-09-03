@@ -350,9 +350,3 @@ target_position = Vector2(0, 10)
 [node name="EdgeCheckLeft" type="RayCast2D" parent="."]
 position = Vector2(25, 35)
 target_position = Vector2(0, 10)
-
-[node name="HealthBar" type="ProgressBar" parent="."]
-offset_left = -24.0
-offset_top = -71.0
-offset_right = 26.0
-offset_bottom = -44.0

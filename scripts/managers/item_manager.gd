@@ -9,7 +9,6 @@ extends Node2D
 	# "damage_up": preload("res://scenes/items/DamageUp.tscn")
 }
 
-# 信號
 
 # 當前房間的道具列表
 var current_items = []

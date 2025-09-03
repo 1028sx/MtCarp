@@ -24,7 +24,7 @@ func on_enter() -> void:
 	hover_timer = 0.0
 	attack_progress = 0.0
 	
-	owner.animated_sprite.play(owner._get_fly_animation())  # 先播放飛行動畫
+	owner.animated_sprite.play(owner._get_fly_animation())
 
 func on_exit() -> void:
 	# 確保離開狀態時，所有攻擊碰撞都關閉
@@ -32,6 +32,9 @@ func on_exit() -> void:
 		owner.attack_area_right.monitoring = false
 	if owner.attack_area_left:
 		owner.attack_area_left.monitoring = false
+	
+	# 恢復正常飛行週期
+	owner.start_new_cycle()
 	super.on_exit()
 
 func process_physics(delta: float) -> void:
@@ -47,19 +50,21 @@ func process_physics(delta: float) -> void:
 		AttackPhase.RECOVERING:
 			_process_recovering(delta)
 
-## 處理定位階段 - 移動到理想攻擊位置
+## 移動到理想攻擊位置
 func _process_positioning(delta: float) -> void:
-	# 計算理想攻擊位置（玩家上方偏移）
+	# 計算理位置（玩家上方）
 	var ideal_attack_pos = attack_target_position + Vector2(0, -80)
 	
-	# 使用平滑飛行移動到位置
-	owner.fly_towards_target(ideal_attack_pos, owner.chase_speed * 0.8, delta)
+	# 設置目標並使用基類的飛行方法
+	owner.current_target = ideal_attack_pos
+	owner.is_flying = true
+	owner.fly_toward_target(delta)
 	
 	# 到達定位點後進入懸停
 	if owner.global_position.distance_to(ideal_attack_pos) < 40:
 		phase = AttackPhase.HOVERING
 		hover_timer = 0.0
-		owner.velocity = owner.velocity * 0.3  # 大幅減速
+		owner.velocity = owner.velocity * 0.3
 
 ## 處理懸停瞄準階段
 func _process_hovering(delta: float) -> void:
@@ -81,7 +86,7 @@ func _process_hovering(delta: float) -> void:
 
 ## 處理俯衝攻擊階段
 func _process_diving(delta: float) -> void:
-	attack_progress += delta * 2.0  # 控制俯衝速度
+	attack_progress += delta * 2.0
 	
 	if attack_progress >= 1.0:
 		_start_recovering()
@@ -101,7 +106,7 @@ func _process_diving(delta: float) -> void:
 	
 	# 計算速度向量
 	var direction = (new_position - owner.global_position)
-	owner.velocity = direction * owner.dive_speed * 0.05  # 調整速度倍率
+	owner.velocity = direction * owner.flight_speed * 1.5 * 0.05
 	
 	# 檢查是否接近目標
 	if owner.global_position.distance_to(attack_target_position) < 30:
@@ -118,13 +123,13 @@ func _process_recovering(delta: float) -> void:
 	# 平滑過渡到爬升
 	var direction = (recover_target - owner.global_position).normalized()
 	owner.velocity = owner.velocity.move_toward(
-		direction * owner.climb_speed,
+		direction * owner.flight_speed,
 		owner.acceleration * delta * 1.5
 	)
 	
-	# 恢復到一定高度後切換狀態
+	# 恢復到一定高度後切換回巡邏狀態
 	if owner.global_position.y < attack_start_position.y - 50:
-		transition_to("Chase")
+		transition_to("Patrol")
 
 ## 開始俯衝
 func _start_diving() -> void:

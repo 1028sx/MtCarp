@@ -1,5 +1,9 @@
 extends "res://addons/MetroidvaniaSystem/Template/Scripts/MetSysGame.gd"
 
+# MetSys SaveManager 整合
+const SaveManager = preload("res://addons/MetroidvaniaSystem/Template/Scripts/SaveManager.gd")
+const SAVE_PATH = "user://metsys_save.dat"
+
 #region 節點引用
 @onready var game_player = $Player
 @onready var enemy_manager = EnemyManager
@@ -117,6 +121,9 @@ func _ready():
 	# 使用MetSys載入初始房間
 	await load_room("beginning/Beginning1.tscn")
 	
+	# 只在初始房間載入時設置玩家位置
+	_setup_player_position()
+	
 	# 確保攝影機限制正確設定
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -133,7 +140,7 @@ var _pause_stack: int = 0
 func _initialize_game():
 	_initialize_sizes()
 	
-	# 初始化MetSys存檔系統
+	# 初始化MetSys存檔系統（必需，避免save_data為null）
 	_initialize_metsys()
 	
 	if game_player:
@@ -143,12 +150,12 @@ func _initialize_game():
 	_connect_signals()
 
 func _initialize_metsys():
-	if MetSys:
-		MetSys.set_save_data()
+	# 只初始化存檔系統，不重複連接信號
+	if MetSys and MetSys.save_data == null:
+		# set_save_data接受Dictionary參數，空字典表示新遊戲
+		MetSys.set_save_data({})
 
 func _connect_signals():
-	# MetSys會自動處理房間轉換信號
-	# 只需要連接玩家相關信號
 	if game_player:
 		if not game_player.health_changed.is_connected(_on_player_health_changed):
 			game_player.health_changed.connect(_on_player_health_changed)
@@ -165,10 +172,7 @@ func _on_room_loaded():
 		if game_player.get_parent():
 			game_player.get_parent().remove_child(game_player)
 		map.add_child(game_player)
-	
-	_setup_player_position()
-	
-	# 房間載入後立即設定攝影機限制
+
 	await get_tree().process_frame
 	_setup_camera_limits()
 	
@@ -201,18 +205,28 @@ func _setup_initial_room():
 func _setup_player_position():
 	if not game_player or not map:
 		return
-		
-	var spawn_points = map.get_node_or_null("SpawnPoints")
-	if not spawn_points:
-		return
-		
-	var left_spawn = spawn_points.get_node_or_null("LeftSpawn")
-	if not left_spawn:
-		return
-		
+	
 	await get_tree().process_frame
 	
-	game_player.position = left_spawn.position
+	# 使用MetSys的RoomInstance計算初始位置
+	var room_instance = MetSys.get_current_room_instance()
+	if not is_instance_valid(room_instance):
+		# 如果沒有從MetSys取得，嘗試從場景取得
+		room_instance = map.get_node_or_null("RoomInstance")
+	
+	if is_instance_valid(room_instance) and room_instance.has_method("get_size"):
+		# 使用RoomInstance的bounds計算位置
+		var room_size = room_instance.get_size()
+		# 將玩家放在房間底部中央，距離底部96像素（安全距離）
+		var initial_position = Vector2(room_size.x / 2, room_size.y - 96)
+		game_player.position = initial_position
+		print("設置玩家初始位置: ", initial_position, " (房間大小: ", room_size, ")")
+	else:
+		# 後備方案：使用MetSys的cell size計算
+		var cell_size = MetSys.settings.in_game_cell_size
+		var initial_position = Vector2(cell_size.x / 2, cell_size.y - 96)
+		game_player.position = initial_position
+		print("使用後備位置: ", initial_position, " (Cell大小: ", cell_size, ")")
 	
 	var camera = game_player.get_node_or_null("Camera2D")
 	if camera:
@@ -252,7 +266,6 @@ func _set_fallback_camera_limits(camera: Camera2D) -> void:
 	camera.limit_bottom = 1080
 
 
-# 舊的敵人生成邏輯已移除 - 現在由EnemyManager基於Marker2D自動處理
 #endregion
 
 #region 遊戲系統
@@ -260,13 +273,11 @@ func request_pause():
 	_pause_stack += 1
 	if _pause_stack > 0:
 		get_tree().paused = true
-		# auto_spawn功能已移除
 
 func request_unpause():
 	_pause_stack = max(0, _pause_stack - 1)
 	if _pause_stack == 0:
 		get_tree().paused = false
-		# auto_spawn功能已移除
 
 func _input(event):
 	if event.is_action_pressed("pause"):
@@ -298,7 +309,6 @@ func _toggle_map() -> void:
 		else:
 			room_manager.show_map()
 
-# 舊的_spawn_enemy方法已移除 - 現在由EnemyManager的Marker2D系統自動處理
 
 
 func _on_player_health_changed(new_health):
@@ -312,16 +322,24 @@ func start_new_game():
 		game_manager.reset_game()
 
 func save_game():
-	var room_manager = _get_room_manager()
-	if game_manager and room_manager:
-		game_manager.save_game()
-		room_manager.save_game_state()
+	var save_manager := SaveManager.new()
+	save_manager.store_game(self)
+	save_manager.save_as_text(SAVE_PATH)
 
 func load_game():
-	var room_manager = _get_room_manager()
-	if game_manager and room_manager:
-		game_manager.load_game()
-		room_manager.load_game_state()
+	if not FileAccess.file_exists(SAVE_PATH):
+		return false
+	
+	var save_manager := SaveManager.new()
+	save_manager.load_from_text(SAVE_PATH)
+	save_manager.retrieve_game(self)
+	
+	# 恢復房間位置（如果有的話）
+	var current_room = save_manager.get_value("current_room", "")
+	if current_room != "" and current_room != MetSys.get_current_room_name():
+		await load_room(current_room)
+	
+	return true
 
 func set_music_volume(volume: float):
 	if game_manager:
@@ -330,6 +348,34 @@ func set_music_volume(volume: float):
 func set_sfx_volume(volume: float):
 	if game_manager:
 		game_manager.set_sfx_volume(volume)
+
+# MetSys SaveManager 整合方法
+func _get_save_data() -> Dictionary:
+	var data = {}
+	
+	# 收集GameManager的數據
+	if game_manager and game_manager.has_method("get_save_data"):
+		data.merge(game_manager.get_save_data())
+	
+	# 收集RespawnManager的數據
+	var respawn_manager = get_node_or_null("/root/RespawnManager")
+	if respawn_manager and respawn_manager.has_method("get_save_data"):
+		data.merge(respawn_manager.get_save_data())
+	
+	# 添加當前房間信息
+	data["current_room"] = MetSys.get_current_room_name()
+	
+	return data
+
+func _set_save_data(data: Dictionary):
+	# 分發數據到GameManager
+	if game_manager and game_manager.has_method("set_save_data"):
+		game_manager.set_save_data(data)
+	
+	# 分發數據到RespawnManager
+	var respawn_manager = get_node_or_null("/root/RespawnManager")
+	if respawn_manager and respawn_manager.has_method("set_save_data"):
+		respawn_manager.set_save_data(data)
 
 
 #endregion
