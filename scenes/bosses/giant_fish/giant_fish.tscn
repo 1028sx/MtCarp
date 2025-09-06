@@ -632,12 +632,39 @@ script = ExtResource("1_je4ny")
 water_splash_scene = ExtResource("2_mtps3")
 wave_scene = ExtResource("3_wy2a0")
 bubble_scene = ExtResource("4_361av")
-boss_name = "GiantFishBoss"
-max_health = 2500.0
-total_phases = 2
-interruptible_frames = {
-"bubble_attack": Vector2i(0, 5)
-}
+dive_duration = null
+submerged_move_speed = null
+submerged_move_timeout = null
+emerge_jump_initial_y_velocity = null
+emerge_jump_horizontal_speed = null
+tail_swipe_duration = null
+bubble_attack_duration = null
+charge_speed_multiplier = null
+attack_interval_min = null
+attack_interval_max = null
+bubbles_per_attack_phase1 = null
+bubbles_per_attack_phase2 = null
+boss_name = null
+max_health = null
+defense = null
+total_phases = null
+enable_retaliation_system = null
+retaliation_cooldown_reduction = null
+move_speed = null
+acceleration = null
+deceleration = null
+phase_transition_time = null
+attack_cooldown = null
+attack_damage = null
+touch_damage = null
+touch_damage_cooldown = null
+special_attack_cooldown = null
+special_attack_damage = null
+attack_range = null
+guaranteed_drops = null
+random_drops = null
+drop_chance = null
+interruptible_frames = null
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 texture_filter = 1

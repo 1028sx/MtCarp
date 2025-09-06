@@ -1,4 +1,4 @@
-extends FieldControllerBase
+extends "res://scripts/bosses/field_controller_base.gd"
 
 class_name BubbleFieldController
 

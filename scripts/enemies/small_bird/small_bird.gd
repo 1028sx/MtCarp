@@ -1,5 +1,13 @@
 extends "res://scripts/enemies/base/flying_enemy_base.gd"
 
+# 預載入狀態類別
+const DeadState = preload("res://scripts/enemies/base/states/common/enemy_dead_state.gd")
+const GroundPatrolState = preload("res://scripts/enemies/small_bird/states/small_bird_ground_patrol_state.gd")
+const TakeoffState = preload("res://scripts/enemies/small_bird/states/small_bird_takeoff_state.gd")
+const LandingState = preload("res://scripts/enemies/small_bird/states/small_bird_landing_state.gd")
+const AirCombatState = preload("res://scripts/enemies/small_bird/states/small_bird_air_combat_state.gd")
+const HurtState = preload("res://scripts/enemies/small_bird/states/small_bird_hurt_state.gd")
+
 #region 導出屬性 (覆寫或新增)
 @export_group("攻擊行為")
 @export var dive_attack_damage: int = 15
@@ -77,12 +85,12 @@ func set_collision_shape_state() -> void:
 
 func _initialize_states() -> void:
 	"""初始化並註冊所有狀態。"""
-	add_state("GroundPatrol", SmallBirdGroundPatrolState.new())
-	add_state("Takeoff", SmallBirdTakeoffState.new())
-	add_state("Landing", SmallBirdLandingState.new())
-	add_state("AirCombat", SmallBirdAirCombatState.new())
-	add_state("Hurt", SmallBirdHurtState.new())
-	add_state("Dead", EnemyDeadState.new())
+	add_state("GroundPatrol", GroundPatrolState.new())
+	add_state("Takeoff", TakeoffState.new())
+	add_state("Landing", LandingState.new())
+	add_state("AirCombat", AirCombatState.new())
+	add_state("Hurt", HurtState.new())
+	add_state("Dead", DeadState.new())
 
 
 #region 動畫名稱覆寫
@@ -129,7 +137,7 @@ func _on_attack_area_area_entered(area: Area2D) -> void:
 func _on_attack_area_body_entered(body: Node) -> void:
 	if body.name == "Player":
 		if body.has_method("take_damage"):
-			body.take_damage(dive_attack_damage, self)
+			body.take_damage(dive_attack_damage)
 	
 	# 將事件轉發給當前狀態
 	if current_state and current_state.has_method("on_attack_area_body_entered"):

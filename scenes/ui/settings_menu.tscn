@@ -1,13 +1,9 @@
-[gd_scene load_steps=12 format=3 uid="uid://c5dkwfaxe46h1"]
+[gd_scene load_steps=8 format=3 uid="uid://c5dkwfaxe46h1"]
 
 [ext_resource type="Script" path="res://scripts/ui/settings_menu.gd" id="1_igh48"]
 [ext_resource type="Texture2D" uid="uid://3a8eqlo4x6bj" path="res://assets/UI/RectangleBox_96x96.png" id="2_jfujy"]
 [ext_resource type="FontFile" uid="uid://3lbgwnx18aru" path="res://assets/UI/Cubic_11.ttf" id="3_dmtw5"]
-[ext_resource type="Texture2D" uid="uid://b2nip0y5unk5w" path="res://assets/UI/SupremeUIPack/Common/Square_Button_Empty.png" id="4_3lygp"]
 [ext_resource type="Texture2D" uid="uid://cxy3wrknalkv2" path="res://assets/UI/SupremeUIPack/Long Buttons/B_Long_Yellow.png" id="4_qco38"]
-[ext_resource type="Texture2D" uid="uid://d2ryylxc6i1le" path="res://assets/UI/SupremeUIPack/Common/Square_Button_Fill.png" id="5_te0ew"]
-[ext_resource type="Texture2D" uid="uid://s0slfgiy18mp" path="res://assets/UI/SupremeUIPack/Common/Handle_Short_Left-Right.png" id="6_0ncd2"]
-[ext_resource type="Texture2D" uid="uid://81i3ct6whwh2" path="res://assets/UI/SupremeUIPack/Common/Square_Button_On.png" id="6_2yosp"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_wcexh"]
 atlas = ExtResource("4_qco38")
@@ -63,17 +59,17 @@ grow_horizontal = 2
 grow_vertical = 2
 scale = Vector2(4, 4)
 
-[node name="VolumeSettings" type="HBoxContainer" parent="Panel/VBoxContainer"]
+[node name="MusicSettings" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="VolumeLabel" type="Label" parent="Panel/VBoxContainer/VolumeSettings"]
+[node name="MusicLabel" type="Label" parent="Panel/VBoxContainer/MusicSettings"]
 custom_minimum_size = Vector2(70, 0)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("3_dmtw5")
 theme_override_font_sizes/font_size = 12
-text = "音量：100%"
+text = "音樂："
 
-[node name="VolumeBar" type="ProgressBar" parent="Panel/VBoxContainer/VolumeSettings"]
+[node name="MusicBar" type="ProgressBar" parent="Panel/VBoxContainer/MusicSettings"]
 custom_minimum_size = Vector2(100, 10)
 layout_mode = 2
 size_flags_vertical = 4
@@ -81,32 +77,39 @@ step = 1.0
 rounded = true
 show_percentage = false
 
-[node name="Slider" type="TextureRect" parent="Panel/VBoxContainer/VolumeSettings/VolumeBar"]
+[node name="Slider" type="HSlider" parent="Panel/VBoxContainer/MusicSettings/MusicBar"]
 layout_mode = 2
 offset_top = -1.0
-offset_right = 41.0
+offset_right = 194.0
 offset_bottom = 23.0
 scale = Vector2(0.5, 0.5)
-texture = ExtResource("6_0ncd2")
-stretch_mode = 4
+value = 50.0
 
-[node name="FullscreenSettings" type="HBoxContainer" parent="Panel/VBoxContainer"]
+[node name="SFXSettings" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="Panel/VBoxContainer/FullscreenSettings"]
+[node name="SFXLabel" type="Label" parent="Panel/VBoxContainer/SFXSettings"]
 custom_minimum_size = Vector2(70, 0)
 layout_mode = 2
 theme_override_fonts/font = ExtResource("3_dmtw5")
 theme_override_font_sizes/font_size = 12
-text = "全螢幕    "
+text = "音效："
 
-[node name="FullscreenButton" type="TextureButton" parent="Panel/VBoxContainer/FullscreenSettings"]
+[node name="SFXBar" type="ProgressBar" parent="Panel/VBoxContainer/SFXSettings"]
+custom_minimum_size = Vector2(100, 10)
 layout_mode = 2
-size_flags_horizontal = 0
-toggle_mode = true
-texture_normal = ExtResource("4_3lygp")
-texture_pressed = ExtResource("5_te0ew")
-texture_hover = ExtResource("6_2yosp")
+size_flags_vertical = 4
+step = 1.0
+rounded = true
+show_percentage = false
+
+[node name="Slider" type="HSlider" parent="Panel/VBoxContainer/SFXSettings/SFXBar"]
+layout_mode = 2
+offset_top = -1.0
+offset_right = 194.0
+offset_bottom = 23.0
+scale = Vector2(0.5, 0.5)
+value = 50.0
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
 layout_mode = 2

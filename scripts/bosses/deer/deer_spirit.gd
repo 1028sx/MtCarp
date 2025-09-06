@@ -100,6 +100,7 @@ func _ready():
 func _initialize_spirit():
 	add_to_group("enemy")
 	add_to_group("deer_spirit")
+	add_to_group("deer_spawnables")  # BOSS衍生物組
 	if animated_sprite:
 		animated_sprite.play("idle")
 		_apply_color_effect()
@@ -376,14 +377,9 @@ func die_state():
 		defeated.emit()
 		
 		# 添加擊殺計數
-		var game_manager = get_tree().get_first_node_in_group("game_manager")
-		if game_manager:
-			game_manager.enemy_killed()
-			
-		# 使用 WordSystem 處理掉落
-		var word_system = get_tree().get_first_node_in_group("word_system")
-		if word_system:
-			word_system.handle_enemy_drops("DeerSpirit", global_position)
+		var combat_system = get_node_or_null("/root/CombatSystem")
+		if combat_system and combat_system.has_method("enemy_killed"):
+			combat_system.enemy_killed()
 #endregion
 
 #region 視覺效果
@@ -497,10 +493,7 @@ func die() -> void:
 	is_dying = true
 	defeated.emit()
 	
-	# 生成漢字掉落
-	var item_manager = get_node("/root/ItemManager")
-	if item_manager:
-		item_manager.spawn_word_drop(self)
+	# 敵人不再掉落word，改由房間和BOSS專門loot系統處理
 	
 	# 創建消失動畫
 	var tween = create_tween()
@@ -557,4 +550,8 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 			if parent.is_attacking or parent.is_special_attacking:
 				var received_damage = parent.get_attack_damage()  # 改用不同的變量名
 				take_damage(received_damage)
+
+# 統一清理接口
+func cleanup():
+	die()
 #endregion

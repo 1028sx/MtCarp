@@ -191,7 +191,7 @@ func _on_touch_damage_area_body_entered(body: Node) -> void:
 		return
 	
 	if body.has_method("take_damage"):
-		body.take_damage(touch_damage, self)
+		body.take_damage(touch_damage)
 		touch_damage_cooldown_timer.start()
 
 func _on_detection_area_body_exited(body: Node) -> void:

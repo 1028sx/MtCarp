@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-const PlayerGlobalScript = preload("res://scripts/globals/PlayerGlobal.gd")
+# 直接使用 PlayerSystem 單例
 
 #region 常量定義
 const NORMAL_TIME_SCALE = 1.0
@@ -14,49 +14,40 @@ const JUMP_VELOCITY = -450.0
 const CHARGE_EFFECT_INTERVAL = 2.0
 #endregion
 
-#region 導出屬性
-@export_group("Movement")
-@export var speed = 200.0
-@export var jump_velocity = -450.0
-@export var max_jumps = 2
-@export var jump_buffer_time = 0.2
-@export var coyote_time = 0.1
+#region 核心數值調整
+@export_group("Core Stats")
+@export var speed: float = 200.0
+@export var jump_velocity: float = -450.0
+@export var dash_speed: float = 250.0
+@export var dash_duration: float = 0.3
+@export var dash_cooldown: float = 0.7
+@export var max_health: int = 100
+@export var normal_attack_damage: float = 50.0
+@export var special_attack_damage: float = 40.0
+@export var invincible_duration: float = 0.5  # 受傷無敵時間
 
-@export_group("Dash")
-@export var dash_speed = 250.0
-@export var dash_duration = 0.3
-@export var dash_cooldown = 0.7
-@export var dash_attack_recovery_time = 0.2
+#endregion
 
-@export_group("Combat")
-@export var max_health = 100
-@export var defense_duration = 0.5
-@export var defense_cooldown = 1.0
-@export var defense_strength = 0.5
-@export var invincible_duration = 0.5
-
-@export_group("Attack")
-@export var attack_move_speed_multiplier = 0.1
-@export var attack_combo_window = 0.5
-@export var attack_hold_threshold = 0.15
-@export var combo_buffer_time = 0.3
-
-@export_group("Special Attack")
-@export var special_attack_velocity = -400
-@export var special_attack_cooldown = 1.0
-
-@export_group("Wall Jump")
-@export var wall_slide_speed: float = 100.0
-@export var wall_jump_horizontal_force: float = 300.0
-@export var wall_jump_vertical_force_multiplier: float = 0.6
-@export var wall_double_jump_multiplier: float = 0.8
-
-@export_group("Variable Jump - Gravity Scaling")
-@export var enable_gravity_scaling: bool = true
-@export var reduced_gravity_scale: float = 0.4  # 上升時重力縮放(40%)
-@export var max_hold_time: float = 0.4          # 最大按住時間
-@export var coyote_frames: int = 6              # 土狼時間(幀)
-@export var jump_buffer_frames: int = 5         # 跳躍緩衝(幀)
+#region 內部變量
+var max_jumps = 1
+var jump_buffer_time = 0.2
+var coyote_time = 0.1
+var dash_attack_recovery_time = 0.2
+var attack_move_speed_multiplier = 0.1
+var attack_combo_window = 0.5
+var attack_hold_threshold = 0.15
+var combo_buffer_time = 0.3
+var special_attack_velocity = -400
+var special_attack_cooldown = 1.0
+var wall_slide_speed: float = 100.0
+var wall_jump_horizontal_force: float = 300.0
+var wall_jump_vertical_force_multiplier: float = 0.6
+var wall_double_jump_multiplier: float = 0.8
+var enable_gravity_scaling: bool = true
+var reduced_gravity_scale: float = 0.4  # 上升時重力縮放(40%)
+var max_hold_time: float = 0.4          # 最大按住時間
+var coyote_frames: int = 6              # 土狼時間(幀)
+var jump_buffer_frames: int = 5         # 跳躍緩衝(幀)
 #endregion
 
 #region 節點引用
@@ -73,7 +64,6 @@ const CHARGE_EFFECT_INTERVAL = 2.0
 @onready var ground_slam_area: Area2D
 
 var shuriken_scene = preload("res://scenes/player/shuriken.tscn")
-var wave_scene = preload("res://scenes/player/dash_wave.tscn")
 #endregion
 
 #region 狀態變量
@@ -125,11 +115,9 @@ var has_revive_heart := true
 
 var gold := 0
 
-var active_effects := {}
 
 var knockback_velocity := Vector2.ZERO
 
-var has_dash_wave := false
 
 var is_charging := false
 var charge_time := 0.0
@@ -140,24 +128,14 @@ var charge_start_timer := 0.0
 var is_charge_ready := false
 var saved_charge_multiplier := 1.0
 
-var base_attack_damage := 50.0
-var base_special_attack_damage := 25.0
 var current_attack_damage: float
 var current_special_attack_damage: float
 
-var swift_dash_multiplier := 1.25
-var swift_dash_cooldown_reduction := 0.5
-var swift_dash_attack_count := 0
-var swift_dash_attack_limit := 3
-var swift_dash_attack_speed_bonus := 1.5
 
 var agile_dash_attack_count := 0
 var agile_dash_attack_limit := 3
 var agile_dash_attack_speed_bonus := 2.0
 
-var rage_stack := 0
-var rage_stack_limit := 5
-var rage_damage_bonus := 0.1
 
 var wall_jump_cooldown_timer := 0.0
 
@@ -170,29 +148,14 @@ signal health_changed(new_health: int)
 signal gold_changed(new_gold: int)
 
 # warning-ignore:unused_signal
-signal effect_changed(effects: Dictionary)
 signal player_fully_died
 
-var agile_perfect_dodge := false
-var agile_dodge_window := 0.2
-var agile_dodge_timer := 0.0
-var agile_damage_multiplier := 2.0
 
-var focus_stack := 0
-var focus_stack_limit := 5
-var focus_damage_bonus := 0.05
-var focus_target: Node = null
-var focus_reset_timer := 0.0
-var focus_reset_time := 10.0
 
 var charge_effect_timer := 0.0
 var has_played_max_charge_effect := false
 var has_played_first_effect := false
 var has_played_second_effect := false
-var has_ice_freeze := false
-var ice_freeze_cooldown := 5.0
-var ice_freeze_timer := 0.0
-var ice_freeze_duration := 2.0
 
 var is_wall_sliding := false
 var last_jump_was_wall_jump := false
@@ -202,6 +165,14 @@ var _took_damage_this_frame := false
 # 禁錮系統變數
 var is_imprisoned: bool = false
 var imprisoning_source: Node = null
+
+# 能力解鎖系統
+var abilities_unlocked = {
+	"wall_jump": false,
+	"double_jump": false, 
+	"ground_slam": false,
+	"agile_dash": false
+}
 
 # 定期狀態檢查計時器
 var imprisonment_check_timer: float = 0.0
@@ -218,13 +189,10 @@ func _ready() -> void:
 	_initialize_player()
 	_connect_signals()
 	_connect_death_state_signal()
-	current_attack_damage = base_attack_damage
-	current_special_attack_damage = base_special_attack_damage
-	active_effects = {}
-	effect_changed.emit(active_effects)
+	current_attack_damage = normal_attack_damage
+	current_special_attack_damage = special_attack_damage
 
-	if PlayerGlobal:
-		PlayerGlobal.register_player(self)
+	PlayerSystem.register_player(self)
 
 func _physics_process(delta: float) -> void:
 	_took_damage_this_frame = false
@@ -281,8 +249,8 @@ func _input(event: InputEvent) -> void:
 		state_machine._input(event)
 
 func _tree_exiting() -> void:
-	if PlayerGlobal and PlayerGlobalScript.get_player() == self:
-		PlayerGlobal.unregister_player()
+	if PlayerSystem.get_player() == self:
+		PlayerSystem.unregister_player()
 
 #endregion
 
@@ -401,7 +369,7 @@ func _adjust_camera_zoom(delta_zoom: float) -> void:
 #endregion
 
 #region 戰鬥系統 (受傷和死亡)
-func take_damage(amount: float, attacker: Node = null) -> void:
+func take_damage(amount: float) -> void:
 	if is_invincible or is_imprisoned or (state_machine and state_machine.current_state is PlayerDashState):
 		return
 		
@@ -410,16 +378,6 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 	
 	health_changed.emit(current_health)
 	
-	if active_effects.has("thorns") and attacker != null:
-		var real_attacker = attacker
-		if attacker.has_method("get_shooter"):
-			real_attacker = attacker.get_shooter()
-		if real_attacker != null and real_attacker.has_method("take_damage"):
-			real_attacker.call("take_damage", amount * 5.0)
-	
-	if active_effects.has("rage") and rage_stack < rage_stack_limit:
-		rage_stack += 1
-		_update_rage_damage()
 
 	if current_health <= 0:
 		# 防止重複處理死亡
@@ -453,10 +411,9 @@ func take_damage(amount: float, attacker: Node = null) -> void:
 
 	if not has_super_armor:
 
-		# 重置連擊 (如果需要)
-		var game_manager = get_tree().get_first_node_in_group("game_manager")
-		if game_manager and game_manager.has_method("reset_combo"): # Assuming GameManager handles combo
-			game_manager.reset_combo() 
+		# 重置連擊
+		if CombatSystem and CombatSystem.has_method("reset_combo"):
+			CombatSystem.reset_combo() 
 
 		# 轉換到 Hurt 狀態
 		if state_machine and state_machine.states.has("hurt"):
@@ -510,7 +467,7 @@ func _on_hitbox_area_entered(area: Area2D) -> void:
 		
 		# 標記本影格已處理傷害，防止重複觸發
 		_took_damage_this_frame = true
-		take_damage(damage_amount, enemy)
+		take_damage(damage_amount)
 
 func _on_effect_finished() -> void:
 	pass
@@ -540,19 +497,6 @@ func _update_global_timers(delta: float) -> void:
 	if wall_jump_cooldown_timer > 0:
 		wall_jump_cooldown_timer -= delta
 
-	if agile_dodge_timer > 0:
-		agile_dodge_timer -= delta
-		if agile_dodge_timer <= 0:
-			agile_perfect_dodge = false
-
-	if focus_target and focus_reset_timer > 0:
-		focus_reset_timer -= delta
-		if focus_reset_timer <= 0:
-			_reset_focus()
-			
-	if ice_freeze_timer > 0:
-		ice_freeze_timer -= delta
-
 func _update_cooldowns(delta: float) -> void:
 	if dash_cooldown_timer > 0:
 		dash_cooldown_timer -= delta
@@ -567,7 +511,7 @@ func _update_cooldowns(delta: float) -> void:
 func _on_landed() -> void:
 	jump_count = 0
 	coyote_timer = coyote_time
-	coyote_frames_left = coyote_frames  # 設置幀精確土狼時間
+	coyote_frames_left = coyote_frames  # 設置幀精土狼時間
 	last_jump_was_wall_jump = false
 	is_double_jumping_after_wall_jump = false
 	set_can_ground_slam(false)
@@ -582,11 +526,6 @@ func get_knockback_force() -> float:
 func get_knockback_direction() -> Vector2:
 	return Vector2.RIGHT if not animated_sprite.flip_h else Vector2.LEFT
 
-func _reset_focus() -> void:
-	if focus_stack > 0:
-		focus_stack = 0
-		focus_target = null
-		focus_reset_timer = 0.0
 
 func reset_charge_state() -> void:
 	if is_charging or charge_damage_multiplier > 1.0:
@@ -625,169 +564,36 @@ func add_gold(amount: int) -> void:
 	gold_changed.emit(gold)
 #endregion
 
-#region 效果系統
-func apply_effect(effect: Dictionary) -> void:
-	if not effect.has("effect"):
-		return
-	
-	var effect_type = effect.effect
-	var previous_effects_count = active_effects.size()
-	
-	match effect_type:
-		"life_steal":
-			active_effects["life_steal"] = true
-			max_health *= 0.5
-			current_health *= 0.5
-			health_changed.emit(current_health)
-			
-		"multi_strike":
-			active_effects["multi_strike"] = true
-			
-		"berserker":
-			active_effects["berserker"] = true
-			health_changed.emit(current_health)
-			
-		"dash_wave":
-			active_effects["dash_wave"] = true
-			has_dash_wave = true
-			
-		"charge_attack_movement":
-			active_effects["charge_attack_movement"] = true
-			max_charge_bonus = effect.max_charge_bonus
-			current_charge_rate = effect.charge_rate
-			enable_charge_attack(effect.max_charge_bonus, effect.charge_rate)
-			
-		"thorns":
-			active_effects["thorns"] = true
-			current_attack_damage *= 0.5
-			current_special_attack_damage *= 0.5
-			max_health *= 3
-			var new_health = current_health *2
-			current_health = new_health
-			health_changed.emit(current_health)
-			
-		"swift_dash":
-			if not active_effects.has("swift_dash"):
-				active_effects["swift_dash"] = true
-				apply_swift_dash()
-			
-		"agile_dash":
-			if not active_effects.has("agile_dash"):
-				active_effects["agile_dash"] = true
-				agile_dash_attack_count = agile_dash_attack_limit
+#region 能力系統
+# 解鎖能力方法
+func unlock_ability(ability_key: String) -> void:
+	if ability_key in abilities_unlocked:
+		abilities_unlocked[ability_key] = true
+		
+		# 特殊處理agile_dash能力
+		if ability_key == "agile_dash":
+			agile_dash_attack_count = agile_dash_attack_limit
+		
+		# 立即更新能力狀態
+		update_abilities_from_unlocks()
 
-		"rage":
-			if not active_effects.has("rage"):
-				active_effects["rage"] = true
-				rage_stack = 0
+# 檢查能力是否解鎖
+func has_ability(ability_key: String) -> bool:
+	return abilities_unlocked.get(ability_key, false)
 
-		"agile":
-			if not active_effects.has("agile"):
-				active_effects["agile"] = true
-
-		"focus":
-			if not active_effects.has("focus"):
-				active_effects["focus"] = true
-				_reset_focus()
-
-		"harvest":
-			if not active_effects.has("harvest"):
-				active_effects["harvest"] = true
-
-		"ice_freeze":
-			active_effects["ice_freeze"] = true
-			has_ice_freeze = true
-			ice_freeze_timer = 0.0
-
-	if active_effects.size() != previous_effects_count or not active_effects.has(effect_type):
-		effect_changed.emit(active_effects)
-
-func apply_swift_dash() -> void:
-	dash_cooldown *= swift_dash_cooldown_reduction
-	dash_speed *= swift_dash_multiplier
-	dash_duration *= swift_dash_multiplier
-
-func remove_swift_dash() -> void:
-	dash_cooldown = 0.7
-	dash_speed = 250.0
-	dash_duration = 0.15
-
-func process_loot_effect(effect_name: String) -> void:
-	match effect_name:
-		"swift_dash":
-			if not active_effects.has("swift_dash"):
-				active_effects["swift_dash"] = true
-				apply_swift_dash()
-
-func _handle_charge_state(delta: float) -> void:
-	if not active_effects or not "charge_attack_movement" in active_effects:
-		if is_charging or charge_damage_multiplier > 1.0:
-			reset_charge_state()
-		return
-	
-	if not is_charging:
-		is_charging = true
-		charge_effect_timer = 0.0
-		if charge_damage_multiplier <= 1.0:
-			charge_time = 0.0
-			charge_damage_multiplier = 1.0
-			has_played_first_effect = false
-			has_played_second_effect = false
-			has_played_max_charge_effect = false
-	
-	charge_time += delta * current_charge_rate
-	var previous_multiplier = charge_damage_multiplier
-	charge_damage_multiplier = min(1.0 + (charge_time * max_charge_bonus), 6.0)
-	
-	if player_effect_manager:
-		if previous_multiplier < 1.2 and charge_damage_multiplier >= 1.2 and not has_played_first_effect:
-			player_effect_manager.play_charge_effect(1.2)
-			has_played_first_effect = true
-		elif previous_multiplier < 3.0 and charge_damage_multiplier >= 3.0 and not has_played_second_effect:
-			player_effect_manager.play_charge_effect(3.0)
-			has_played_second_effect = true
-		elif previous_multiplier < 5.0 and charge_damage_multiplier >= 5.0 and not has_played_max_charge_effect:
-			player_effect_manager.play_charge_complete_effect()
-			has_played_max_charge_effect = true
-
-func enable_charge_attack(_max_bonus: float, _charge_rate: float) -> void:
-	max_charge_bonus = 5.0
-	current_charge_rate = 0.8
-	active_effects["charge_attack_movement"] = true
-
-func get_berserker_multiplier() -> float:
-	if not active_effects.has("berserker"):
-		return 1.0
-	
-	var health_percent = float(current_health) / float(max_health)
-	var lost_health_percent = 1.0 - health_percent
-	return min(1.0 + lost_health_percent, 2.0)
 
 func reset_all_states() -> void:
-	if active_effects.has("swift_dash"):
-		remove_swift_dash()
-	var effects_were_cleared = not active_effects.is_empty()
-	active_effects.clear()
-	if effects_were_cleared:
-		effect_changed.emit(active_effects)
-	has_dash_wave = false
-	max_jumps = 2
+	update_abilities_from_unlocks()
 	
 	reset_move_speed()
 	reset_jump_height()
 	reset_attack_speed()
 	reset_damage()
 	reset_dash_distance()
-	
-	is_charging = false
-	charge_time = 0.0
-	charge_damage_multiplier = 1.0
-	charge_start_timer = 0.0
-	is_charge_ready = false
-	max_charge_bonus = 1.0
-	current_charge_rate = 0.15
-	if player_effect_manager:
-		player_effect_manager.stop_charge_effect()
+
+func update_abilities_from_unlocks() -> void:
+	# 根據解鎖狀態設定能力  
+	max_jumps = 2 if has_ability("double_jump") else 1
 	
 	current_health = max_health
 	
@@ -821,14 +627,8 @@ func reset_all_states() -> void:
 		animated_sprite.play("idle")
 	
 	agile_dash_attack_count = 0
-	active_effects.erase("agile_dash")
 	
-	rage_stack = 0
-	active_effects.erase("rage")
 	
-	has_ice_freeze = false
-	ice_freeze_timer = 0.0
-	active_effects.erase("ice_freeze")
 
 func _on_effect_manager_effect_finished() -> void:
 	pass
@@ -847,20 +647,6 @@ func apply_knockback(knockback: Vector2) -> void:
 	
 	move_and_slide()
 
-func create_dash_wave() -> void:
-	if not wave_scene:
-		return
-		
-	var wave = wave_scene.instantiate()
-	get_parent().add_child(wave)
-	wave.global_position = global_position
-	
-	if dash_direction < 0:
-		wave.rotation = PI
-		wave.scale.x = -1
-	else:
-		wave.rotation = 0
-		wave.scale.x = 1
 
 func _handle_jump() -> void:
 	if Input.is_action_just_pressed("jump"):
@@ -884,18 +670,18 @@ func boost_attack_speed(multiplier: float) -> void:
 		animated_sprite.speed_scale *= multiplier
 
 func boost_damage(multiplier: float) -> void:
-	current_attack_damage = base_attack_damage * multiplier
-	current_special_attack_damage = base_special_attack_damage * multiplier
+	current_attack_damage = normal_attack_damage * multiplier
+	current_special_attack_damage = special_attack_damage * multiplier
 
 func boost_dash_distance(multiplier: float) -> void:
 	dash_duration *= multiplier
 
 func reset_move_speed() -> void:
-	speed = 200.0
-	dash_speed = 250.0
+	speed = 200.0  # 重置為初始值
+	dash_speed = 250.0  # 重置為初始值
 
 func reset_jump_height() -> void:
-	jump_velocity = -450.0
+	jump_velocity = -450.0  # 重置為初始值
 
 func reset_attack_speed() -> void:
 	attack_combo_window = 0.5
@@ -903,15 +689,13 @@ func reset_attack_speed() -> void:
 		animated_sprite.speed_scale = 1.0
 
 func reset_damage() -> void:
-	current_attack_damage = base_attack_damage
-	current_special_attack_damage = base_special_attack_damage
-	rage_stack = 0
+	current_attack_damage = normal_attack_damage
+	current_special_attack_damage = special_attack_damage
 
 func reset_dash_distance() -> void:
-	dash_duration = 0.3
+	dash_duration = 0.3  # 重置為初始值
 
 func disable_charge_attack() -> void:
-	active_effects.erase("charge_attack_movement")
 	
 	is_charging = false
 	charge_time = 0.0
@@ -925,10 +709,8 @@ func disable_charge_attack() -> void:
 	if player_effect_manager:
 		player_effect_manager.stop_charge_effect()
 
-func _update_rage_damage() -> void:
-	var total_bonus = rage_stack * rage_damage_bonus
-	current_attack_damage = base_attack_damage * (1 + total_bonus)
-	current_special_attack_damage = base_special_attack_damage * (1 + total_bonus)
+	current_attack_damage = normal_attack_damage
+	current_special_attack_damage = special_attack_damage
 
 func is_about_to_be_hit() -> bool:
 	var hitbox = $Hitbox
@@ -948,25 +730,6 @@ func is_about_to_be_hit() -> bool:
 	
 	return false
 
-func start_ice_freeze_attack() -> void:
-	current_attack_combo = 0
-	
-	if animated_sprite:
-		var mouse_pos = get_global_mouse_position()
-		var direction_to_mouse = (mouse_pos - global_position).normalized()
-		animated_sprite.flip_h = direction_to_mouse.x < 0
-		animated_sprite.play("attack1")
-		
-		if attack_area:
-			attack_area.scale.x = -1 if animated_sprite.flip_h else 1
-	
-	if attack_area:
-		attack_area.monitoring = true
-	
-	ice_freeze_timer = ice_freeze_cooldown
-	
-	if player_effect_manager:
-		player_effect_manager.play_ice_effect()
 
 func restore_health() -> void:
 	current_health = max_health
@@ -991,6 +754,9 @@ func restore_lives() -> void:
 
 func _handle_ground_slam_input() -> void:
 	if Input.is_action_just_pressed("ground_slam"):
+		# 檢查是否已解鎖地面衝擊能力
+		if not has_ability("ground_slam"):
+			return
 		
 		if can_perform_ground_slam and not is_on_floor():
 			if state_machine and state_machine.states.has("groundslam"): 

@@ -14,10 +14,9 @@ func _ready() -> void:
 		label.modulate.a = 0.0
 		label.show()
 	
-	# 監聽房間切換
-	var room_manager = get_tree().get_first_node_in_group("room_manager")
-	if room_manager and room_manager.has_signal("room_changed"):
-		room_manager.room_changed.connect(_on_room_changed)
+	# 監聽房間切換 - 使用新的 RoomSystem
+	if RoomSystem and RoomSystem.has_signal("room_changed"):
+		RoomSystem.room_changed.connect(_on_room_changed)
 
 func _process(_delta: float) -> void:
 	var player = get_tree().get_first_node_in_group("player")

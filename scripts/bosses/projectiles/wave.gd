@@ -1,6 +1,6 @@
 extends Area2D
 
-class_name WaveProjectile
+class_name Wave_projectile
 
 @export var move_speed: float = 200.0
 @export var damage: float = 20.0
@@ -21,6 +21,9 @@ func _ready():
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
 	visibility_notifier.screen_exited.connect(_on_screen_exited)
+	
+	# 加入BOSS衍生物組（統一清理用）
+	add_to_group("giantfish_spawnables")
 	
 	# 播放出現動畫
 	if animated_sprite and animated_sprite.sprite_frames.has_animation("appear"):
@@ -105,7 +108,7 @@ func _hit_target(target: Node):
 	
 	# 對目標造成傷害並施加擊退效果
 	if target.has_method("take_damage"):
-		target.take_damage(damage, self)
+		target.take_damage(damage)
 	
 	if target.has_method("apply_knockback"):
 		var knockback_vector = move_direction.normalized() * knockback_force
@@ -136,6 +139,10 @@ func _on_destroy_finished():
 # SpawnableManager 類型檢測
 func get_spawnable_type() -> String:
 	return "wave"
+
+# 統一清理接口
+func cleanup():
+	_destroy()
 
 func reset():
 	"""物件池重置函數"""

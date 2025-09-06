@@ -18,6 +18,7 @@ atlas = ExtResource("2_c8cr4")
 region = Rect2(38.0656, 0, 38.9556, 18)
 
 [node name="PauseMenu" type="Control"]
+process_mode = 3
 layout_mode = 3
 anchors_preset = 0
 offset_right = 40.0

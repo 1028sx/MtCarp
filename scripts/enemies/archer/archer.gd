@@ -1,5 +1,13 @@
 extends "res://scripts/enemies/base/enemy_ai_base.gd"
 
+# 預載入狀態類別
+const IdleState = preload("res://scripts/enemies/base/states/common/enemy_idle_state.gd")
+const WanderState = preload("res://scripts/enemies/base/states/common/enemy_wander_state.gd")
+const DeadState = preload("res://scripts/enemies/base/states/common/enemy_dead_state.gd")
+const ChaseState = preload("res://scripts/enemies/archer/states/archer_chase_state.gd")
+const AttackState = preload("res://scripts/enemies/archer/states/archer_attack_state.gd")
+const HurtState = preload("res://scripts/enemies/archer/states/archer_hurt_state.gd")
+const HoldPositionState = preload("res://scripts/enemies/archer/states/archer_hold_position_state.gd")
 
 @export_group("理想距離區間")
 @export var optimal_attack_range_min: float = 150.0 # 理想攻擊距離下限
@@ -26,13 +34,13 @@ func _ready() -> void:
 	register_zone("in_attack_zone", $AttackArea)
 	register_zone("in_retreat_zone", $RetreatRangeArea)
 	
-	add_state("Idle", EnemyIdleState.new())
-	add_state("Wander", EnemyWanderState.new())
-	add_state("Chase", ArcherChaseState.new())
-	add_state("Attack", ArcherAttackState.new())
-	add_state("Hurt", ArcherHurtState.new())
-	add_state("Dead", EnemyDeadState.new())
-	add_state("HoldPosition", ArcherHoldPositionState.new())
+	add_state("Idle", IdleState.new())
+	add_state("Wander", WanderState.new())
+	add_state("Chase", ChaseState.new())
+	add_state("Attack", AttackState.new())
+	add_state("Hurt", HurtState.new())
+	add_state("Dead", DeadState.new())
+	add_state("HoldPosition", HoldPositionState.new())
 	
 	change_state("Idle")
 
@@ -67,14 +75,10 @@ func take_damage(amount: float, attacker: Node) -> void:
 
 
 func _on_death() -> void:
-	# 遊戲邏輯 (通知 GameManager、掉落物等)
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager and game_manager.has_method("enemy_killed"):
-		game_manager.enemy_killed()
-		
-	var word_system = get_tree().get_first_node_in_group("word_system")
-	if word_system and word_system.has_method("handle_enemy_drops"):
-		word_system.handle_enemy_drops("Archer", global_position)
+	# 遊戲邏輯 (通知 CombatSystem、掉落物等)
+	var combat_system = get_node_or_null("/root/CombatSystem")
+	if combat_system and combat_system.has_method("enemy_killed"):
+		combat_system.enemy_killed()
 		
 	# 執行父類的死亡邏輯 (禁用物理、碰撞等)
 	super._on_death()
@@ -93,7 +97,7 @@ func shoot_arrow() -> void:
 	if locked_target_position == Vector2.ZERO:
 		return
 
-	# 計算正確的箭矢生成位置（考慮角色朝向）
+	# 計算箭矢生成位置
 	var spawn_pos = _get_corrected_spawn_position()
 	
 	# 臨時實例化箭矢以獲取物理參數
@@ -124,7 +128,6 @@ func _get_corrected_spawn_position() -> Vector2:
 
 func _calculate_attack_direction(spawn_pos: Vector2, target_pos: Vector2, arrow_speed: float, arrow_gravity: float) -> Vector2:
 	# 計算考慮重力補償的最佳攻擊方向。
-	# 計算補償後的目標位置
 	var compensated_target = _calculate_compensated_target(spawn_pos, target_pos, arrow_speed, arrow_gravity)
 	
 	return (compensated_target - spawn_pos).normalized()

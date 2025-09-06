@@ -20,6 +20,10 @@ signal defeated
 @export var height_tolerance = 50.0
 @export var invincible_time = 1.0
 
+# BOSS系統屬性
+var boss_name: String = ""
+signal boss_defeated
+
 @onready var animated_sprite = $AnimatedSprite2D
 @onready var detection_area = $DetectionArea
 @onready var attack_area = $AttackArea
@@ -41,6 +45,9 @@ var can_attack = true
 var is_invincible = false
 
 func _ready():
+	# 設置boss名稱用於系統識別
+	boss_name = "boar"
+	
 	_initialize_enemy()
 	_setup_collisions()
 	_setup_components()
@@ -208,19 +215,15 @@ func die_state(_delta):
 	if not is_dying:
 		is_dying = true
 		defeated.emit()
+		boss_defeated.emit()  # 為BOSS系統添加信號
 		
 		# 添加擊殺計數
-		var game_manager = get_tree().get_first_node_in_group("game_manager")
-		if game_manager:
-			game_manager.enemy_killed()
+		var combat_system = get_node_or_null("/root/CombatSystem")
+		if combat_system and combat_system.has_method("enemy_killed"):
+			combat_system.enemy_killed()
 		
 		if animated_sprite:
 			animated_sprite.play("die")
-			
-		# 使用 WordSystem 處理掉落
-		var word_system = get_tree().get_first_node_in_group("word_system")
-		if word_system:
-			word_system.handle_enemy_drops("Boar", global_position)
 
 func change_state(new_state):
 	if is_dying:

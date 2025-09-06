@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-class_name BubbleProjectile
+class_name Bubble_projectile
 
 @export var move_speed: float = 100.0
 @export var damage: float = 10.0
@@ -67,6 +67,9 @@ func _ready():
 	
 	# 先獲取 Area2D 節點引用
 	hitbox_area = get_node("Hitbox")
+	
+	# 加入BOSS衍生物組（統一清理用）
+	add_to_group("giantfish_spawnables")
 	touch_damage_area = get_node("TouchDamageArea")
 	
 	# 設置共用碰撞形狀系統（現在有正確的節點引用）
@@ -317,6 +320,10 @@ func _on_destroy_finished():
 # SpawnableManager 類型檢測
 func get_spawnable_type() -> String:
 	return "bubble"
+
+# 統一清理接口
+func cleanup():
+	_destroy()
 
 func reset():
 	"""物件池重置函數"""

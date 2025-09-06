@@ -1,5 +1,5 @@
 class_name PlayerAttackState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var idle_state: PlayerState
 @export var fall_state: PlayerState
@@ -15,7 +15,7 @@ func _play_combo_animation() -> void:
 	
 	var speed_multiplier = 1.0
 	
-	if player.active_effects.has("agile_dash") and player.agile_dash_attack_count > 0:
+	if player.has_ability("agile_dash") and player.agile_dash_attack_count > 0:
 		speed_multiplier *= player.agile_dash_attack_speed_bonus
 		
 
@@ -63,8 +63,6 @@ func enter() -> void:
 		player.is_in_dash_attack_recovery = true
 		player.dash_attack_recovery_timer = player.dash_attack_recovery_time
 	else:
-		if player.current_attack_combo == 0 and player.active_effects.has("agile") and player.agile_perfect_dodge:
-			player.agile_perfect_dodge = false
 		
 		if player.charge_damage_multiplier > 1.0:
 			pass
@@ -181,19 +179,13 @@ func _apply_attack_damage() -> void:
 		if body and is_instance_valid(body) and body.is_in_group("enemy") and body.has_method("take_damage") and not player.hit_enemies.has(body):
 			player.hit_enemies.append(body)
 			
-			var base_dmg = player.base_attack_damage
+			var base_dmg = player.normal_attack_damage
 			var multiplier = 1.0
 			
 			if is_dash_attack:
 				multiplier *= 1.5
 			if player.charge_damage_multiplier > 1.0:
 				multiplier *= player.charge_damage_multiplier
-			if player.active_effects.has("berserker"):
-				multiplier *= player.get_berserker_multiplier()
-			if player.active_effects.has("agile") and player.agile_perfect_dodge:
-				multiplier *= player.agile_damage_multiplier
-			if player.active_effects.has("focus") and player.focus_target == body:
-				multiplier *= (1.0 + player.focus_stack * player.focus_damage_bonus)
 			
 			var damage = base_dmg * multiplier
 			
@@ -211,14 +203,4 @@ func _apply_attack_damage() -> void:
 				else:
 					body.take_damage(damage, player)
 			
-			if player.active_effects.has("life_steal"):
-				player.current_health = min(player.current_health + 2, player.max_health)
-				player.health_changed.emit(player.current_health)
 				
-			if player.active_effects.has("focus"):
-				if player.focus_target != body:
-					player.focus_stack = 1
-					player.focus_target = body
-				else:
-					player.focus_stack = min(player.focus_stack + 1, player.focus_stack_limit)
-				player.focus_reset_timer = player.focus_reset_time

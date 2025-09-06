@@ -44,7 +44,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_msk7l")
 theme_override_font_sizes/font_size = 36
-text = "可用成語"
+text = "可用成語："
 
 [node name="IdiomHints" type="VBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
 custom_minimum_size = Vector2(0, 50)
@@ -57,7 +57,7 @@ layout_mode = 2
 layout_mode = 2
 theme_override_fonts/font = ExtResource("2_msk7l")
 theme_override_font_sizes/font_size = 36
-text = "收集的漢字"
+text = "可用文字："
 
 [node name="CollectedWords" type="GridContainer" parent="Panel/MarginContainer/VBoxContainer" groups=["collected_words"]]
 layout_mode = 2
@@ -71,5 +71,5 @@ theme_override_fonts/font = ExtResource("2_msk7l")
 theme_override_font_sizes/font_size = 24
 text = "點擊文字放上成語欄
 點擊成語欄卸下文字
-按Q或Esc離開選單
+按Esc或Q鍵離開選單
 "

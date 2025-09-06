@@ -10,6 +10,7 @@ signal activated(respawn_point: RespawnPoint)
 var is_activated: bool = false
 var can_interact: bool = false
 var fade_tween: Tween
+var respawn_system_enabled: bool = false
 
 func _ready() -> void:
 	add_to_group("respawn_points")
@@ -17,6 +18,15 @@ func _ready() -> void:
 	# 連接信號
 	body_entered.connect(_on_body_entered)
 	body_exited.connect(_on_body_exited)
+	
+	# 檢查重生點系統是否已啟用
+	_check_respawn_system_status()
+	
+	# 連接RewardSystem信號
+	var reward_system = get_node_or_null("/root/RewardSystem")
+	if reward_system:
+		if not reward_system.respawn_system_unlocked.is_connected(_on_respawn_system_unlocked):
+			reward_system.respawn_system_unlocked.connect(_on_respawn_system_unlocked)
 	
 	# 設定初始狀態
 	_setup_visual_state()
@@ -39,7 +49,10 @@ func _setup_visual_state() -> void:
 
 func _setup_interaction_prompt() -> void:
 	if interaction_prompt:
-		interaction_prompt.text = "S鍵啟動重生點"
+		if respawn_system_enabled:
+			interaction_prompt.text = "S鍵啟動重生點"
+		else:
+			interaction_prompt.text = "需要先啟用重生點系統"
 		interaction_prompt.modulate.a = 0.0
 		interaction_prompt.visible = false
 
@@ -59,7 +72,7 @@ func _check_if_should_be_active(respawn_manager) -> void:
 			_setup_visual_state()  # 重新設置視覺狀態
 
 func _input(event: InputEvent) -> void:
-	if can_interact and not is_activated:
+	if can_interact and not is_activated and respawn_system_enabled:
 		if event.is_action_pressed("interact"):
 			_activate_respawn_point()
 
@@ -167,3 +180,17 @@ func get_room_name() -> String:
 		room_node = room_node.get_parent()
 	
 	return "Unknown"
+
+func _check_respawn_system_status() -> void:
+	var reward_system = get_node_or_null("/root/RewardSystem")
+	if reward_system:
+		respawn_system_enabled = reward_system.is_respawn_system_enabled()
+
+func _on_respawn_system_unlocked() -> void:
+	respawn_system_enabled = true
+	_setup_interaction_prompt()  # 更新提示文字
+	print("重生點 ", get_room_name(), " 系統已啟用")
+
+func enable_respawn_functionality() -> void:
+	respawn_system_enabled = true
+	_setup_interaction_prompt()  # 更新提示文字

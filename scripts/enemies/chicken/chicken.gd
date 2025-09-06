@@ -1,5 +1,15 @@
 extends "res://scripts/enemies/base/enemy_ai_base.gd"
 
+# 預載入狀態類別
+const IdleState = preload("res://scripts/enemies/base/states/common/enemy_idle_state.gd")
+const WanderState = preload("res://scripts/enemies/base/states/common/enemy_wander_state.gd")
+const HurtState = preload("res://scripts/enemies/base/states/common/enemy_hurt_state.gd")
+const ChaseState = preload("res://scripts/enemies/chicken/states/chicken_chase_state.gd")
+const JumpState = preload("res://scripts/enemies/chicken/states/chicken_jump_state.gd")
+const FallState = preload("res://scripts/enemies/chicken/states/chicken_fall_state.gd")
+const AttackState = preload("res://scripts/enemies/chicken/states/chicken_attack_state.gd")
+const DeadState = preload("res://scripts/enemies/chicken/states/chicken_dead_state.gd")
+
 #region 導出屬性 (覆寫或新增)
 @export_group("小雞特有屬性")
 @export var jump_cooldown: float = 2.0 # 跳躍冷卻時間 (秒)
@@ -77,19 +87,19 @@ func _ready() -> void:
 
 func _initialize_states() -> void:
 	"""初始化並註冊所有狀態。"""
-	add_state("Idle", EnemyIdleState.new())
-	add_state("Wander", EnemyWanderState.new())
+	add_state("Idle", IdleState.new())
+	add_state("Wander", WanderState.new())
 	
 	# 將共享資源注入狀態
-	var chase_state_instance = ChickenChaseState.new()
+	var chase_state_instance = ChaseState.new()
 	chase_state_instance.jump_cooldown_timer = jump_cooldown_timer
 	add_state("Chase", chase_state_instance)
 
-	add_state("Jump", ChickenJumpState.new())
-	add_state("Fall", ChickenFallState.new())
-	add_state("Attack", ChickenAttackState.new())
-	add_state("Hurt", EnemyHurtState.new())
-	add_state("Dead", ChickenDeadState.new())
+	add_state("Jump", JumpState.new())
+	add_state("Fall", FallState.new())
+	add_state("Attack", AttackState.new())
+	add_state("Hurt", HurtState.new())
+	add_state("Dead", DeadState.new())
 
 
 # EnemyAIBase 的 _physics_process 會自動呼叫當前狀態的 process_physics
@@ -143,7 +153,7 @@ func _on_attack_area_area_entered(area: Area2D) -> void:
 func _on_attack_area_body_entered(body: Node) -> void:
 	if body.name == "Player":
 		if body.has_method("take_damage"):
-			body.take_damage(touch_damage, self)
+			body.take_damage(touch_damage)
 	# 將事件轉發給當前狀態
 	if current_state and current_state.has_method("on_attack_area_body_entered"):
 		current_state.on_attack_area_body_entered(body)

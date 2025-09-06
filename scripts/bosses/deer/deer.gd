@@ -28,6 +28,9 @@ signal boss_defeated
 @export var unification_platforms = []  # 歸一時的指定平台節點路徑
 #endregion
 
+# BOSS系統屬性
+var boss_name: String = ""
+
 #region 常量
 const SPIRIT_COLORS = ["Red", "Orange", "Yellow", "Green", "Blue", "Purple", "Black", "White"]
 const SPIRIT_HEALTH = 3  # 精靈需要被打三次
@@ -90,6 +93,9 @@ var jump_attempt_count = 0  # 跳躍嘗試次數
 
 #region 初始化
 func _ready():
+	# 設置boss名稱用於系統識別
+	boss_name = "deer"
+	
 	# 確保將自己添加到boss組
 	if not is_in_group("boss"):
 		add_to_group("boss")
@@ -741,9 +747,9 @@ func die():
 		animated_sprite.play("die")
 	
 	# 添加擊殺計數
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager:
-		game_manager.enemy_killed()
+	var combat_system = get_node_or_null("/root/CombatSystem")
+	if combat_system and combat_system.has_method("enemy_killed"):
+		combat_system.enemy_killed()
 	
 	# 發送死亡信號
 	boss_defeated.emit()  # 修改：使用boss_defeated信號代替defeated

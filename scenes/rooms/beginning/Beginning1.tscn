@@ -130,6 +130,7 @@ physics_layer_0/collision_layer = 1
 sources/1 = SubResource("TileSetAtlasSource_w7uvy")
 
 [node name="Beginning1" type="Node2D" groups=["room"]]
+metadata/_edit_lock_ = true
 
 [node name="GroundLayer" type="TileMapLayer" parent="."]
 use_parent_material = true

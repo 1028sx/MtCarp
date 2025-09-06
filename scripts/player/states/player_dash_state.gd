@@ -1,5 +1,5 @@
 class_name PlayerDashState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var idle_state: PlayerState
 @export var fall_state: PlayerState
@@ -22,8 +22,6 @@ func enter() -> void:
 		player.dash_direction = -1 if player.animated_sprite.flip_h else 1
 
 	var current_dash_speed = player.dash_speed
-	if player.active_effects.has("swift_dash"):
-		current_dash_speed *= player.swift_dash_multiplier
 	player.velocity = Vector2(player.dash_direction * current_dash_speed, 0)
 
 	player.animated_sprite.play("dash")
@@ -33,8 +31,6 @@ func enter() -> void:
 
 func process_physics(delta: float) -> void:
 	var current_dash_speed = player.dash_speed
-	if player.active_effects.has("swift_dash"):
-		current_dash_speed *= player.swift_dash_multiplier
 	player.velocity.x = player.dash_direction * current_dash_speed
 	if not player.is_on_floor():
 		player.velocity.y = min(player.velocity.y, 0)
@@ -63,7 +59,7 @@ func exit() -> void:
 
 	if not dash_attack_requested:
 		player.velocity.x *= 0.5
-		if player.active_effects.has("agile_dash"):
+		if player.has_ability("agile_dash"):
 			player.agile_dash_attack_count = player.agile_dash_attack_limit
 
 	# 觸發衝刺波 (如果擁有能力且不是以攻擊結束)

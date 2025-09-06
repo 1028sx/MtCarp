@@ -1,6 +1,10 @@
 extends Control
 
+@onready var start_button = $VBoxContainer/HBoxContainer2/StartButton
+@onready var quit_button = $VBoxContainer/HBoxContainer/QuitButton
+
 var is_transitioning := false
+var ui_system: Node
 
 func _ready() -> void:
 	# 確保遊戲時間恢復正常
@@ -9,18 +13,15 @@ func _ready() -> void:
 	# 禁用所有遊戲內 UI
 	get_tree().paused = false
 	
-	# 清理可能存在的遊戲內 UI
-	for group_name in ["inventory_ui", "loot_selection_ui", "pause_menu", "settings_menu"]:
-		var nodes = get_tree().get_nodes_in_group(group_name)
-		for node in nodes:
-			node.queue_free()
+	# 獲取UISystem引用
+	ui_system = get_node_or_null("/root/UISystem")
+	if ui_system:
+		ui_system.change_ui_state(ui_system.UIState.MENU, false)
+		ui_system.cleanup_game_ui()
 	
-	# 手動連接信號
-	var start_button = $VBoxContainer/HBoxContainer2/StartButton
+	# 信號連接
 	if start_button and not start_button.pressed.is_connected(_on_start_button_pressed):
 		start_button.pressed.connect(_on_start_button_pressed)
-		
-	var quit_button = $VBoxContainer/HBoxContainer/QuitButton
 	if quit_button and not quit_button.pressed.is_connected(_on_quit_button_pressed):
 		quit_button.pressed.connect(_on_quit_button_pressed)
 
@@ -29,23 +30,10 @@ func _on_start_button_pressed() -> void:
 		return
 		
 	is_transitioning = true
-	$VBoxContainer/HBoxContainer2/StartButton.disabled = true
+	start_button.disabled = true
 	
-	var transition_screen = get_node_or_null("/root/TransitionScreen")
-	if transition_screen:
-		await transition_screen.fade_to_black()
-		# 確保場景存在
-		if ResourceLoader.exists("res://scenes/main.tscn"):
-			get_tree().change_scene_to_file("res://scenes/main.tscn")
-			await transition_screen.fade_from_black()
-		else:
-			push_error("無法找到主場景檔案")
-			is_transitioning = false
-			$VBoxContainer/HBoxContainer2/StartButton.disabled = false
-	else:
-		push_error("無法找到過場動畫節點")
-		is_transitioning = false
-		$VBoxContainer/HBoxContainer2/StartButton.disabled = false
+	ui_system.change_ui_state(ui_system.UIState.GAME, false)
+	await ui_system.request_scene_transition("res://scenes/main.tscn")
 
 func _on_quit_button_pressed() -> void:
 	get_tree().quit() 

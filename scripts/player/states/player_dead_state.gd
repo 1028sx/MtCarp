@@ -1,4 +1,4 @@
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 class_name PlayerDeadState
 

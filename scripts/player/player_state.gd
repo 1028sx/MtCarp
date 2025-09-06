@@ -4,7 +4,7 @@ extends Node
 var player: CharacterBody2D
 var state_machine
 
-var state_name := "PlayerState"
+var state_name := "player_state"
 
 #為繼承的狀態覆寫
 func enter() -> void:

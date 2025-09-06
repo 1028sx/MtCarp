@@ -47,12 +47,12 @@ func accept_word(word_text: String) -> void:
 	_check_idiom_formation()
 
 func _check_idiom_formation() -> void:
-	var word_system = get_tree().get_first_node_in_group("word_system")
+	var word_system = WordSystem
 	if not word_system:
 		return
 		
 	var current_combination = _get_current_combination()
-	if current_combination in word_system.IDIOMS:
+	if word_system.is_valid_idiom(current_combination):
 		word_system.unlock_idiom_effect(current_combination)
 	else:
 		word_system.update_active_effects("")
@@ -70,7 +70,7 @@ func remove_word() -> void:
 	current_word = null
 	
 	if word_text != "":
-		var word_system = get_tree().get_first_node_in_group("word_system")
+		var word_system = WordSystem
 		if word_system:
 			word_system.update_active_effects("")
 

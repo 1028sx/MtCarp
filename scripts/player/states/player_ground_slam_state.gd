@@ -1,5 +1,5 @@
 class_name PlayerGroundSlamState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 var animated_sprite: AnimatedSprite2D
 var effect_manager: Node

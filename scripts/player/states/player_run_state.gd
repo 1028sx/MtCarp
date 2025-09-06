@@ -1,5 +1,5 @@
 class_name PlayerRunState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var idle_state: PlayerState
 @export var jump_state: PlayerState

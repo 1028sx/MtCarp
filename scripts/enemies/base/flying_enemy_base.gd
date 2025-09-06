@@ -1,4 +1,4 @@
-extends EnemyAIBase
+extends "res://scripts/enemies/base/enemy_ai_base.gd"
 
 class_name FlyingEnemyBase
 

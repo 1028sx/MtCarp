@@ -1447,6 +1447,7 @@ attack_state = NodePath("../Attack")
 special_attack_state = NodePath("../SpecialAttack")
 dash_state = NodePath("../Dash")
 wall_slide_state = NodePath("../WallSlide")
+air_control_factor = null
 
 [node name="Dash" type="Node" parent="StateMachine" node_paths=PackedStringArray("idle_state", "fall_state", "attack_state")]
 script = ExtResource("24_8sbic")

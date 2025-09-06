@@ -1,6 +1,6 @@
 extends Node
 
-signal respawn_point_activated(respawn_point: RespawnPoint)
+signal respawn_point_activated(point: RespawnPoint)
 signal player_respawned(position: Vector2)
 
 var registered_respawn_points: Array[RespawnPoint] = []
@@ -15,31 +15,31 @@ func _ready() -> void:
 	# 確保在場景樹中的優先級
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
-func register_respawn_point(respawn_point: RespawnPoint) -> void:
-	if respawn_point not in registered_respawn_points:
-		registered_respawn_points.append(respawn_point)
+func register_respawn_point(point: RespawnPoint) -> void:
+	if point not in registered_respawn_points:
+		registered_respawn_points.append(point)
 		
 		# 連接信號
-		if not respawn_point.activated.is_connected(_on_respawn_point_activated):
-			respawn_point.activated.connect(_on_respawn_point_activated)
+		if not point.activated.is_connected(_on_respawn_point_activated):
+			point.activated.connect(_on_respawn_point_activated)
 
-func unregister_respawn_point(respawn_point: RespawnPoint) -> void:
-	var index = registered_respawn_points.find(respawn_point)
+func unregister_respawn_point(point: RespawnPoint) -> void:
+	var index = registered_respawn_points.find(point)
 	if index >= 0:
 		registered_respawn_points.remove_at(index)
 		
 		# 斷開信號
-		if respawn_point.activated.is_connected(_on_respawn_point_activated):
-			respawn_point.activated.disconnect(_on_respawn_point_activated)
+		if point.activated.is_connected(_on_respawn_point_activated):
+			point.activated.disconnect(_on_respawn_point_activated)
 
-func set_active_respawn_point(respawn_point: RespawnPoint) -> void:
+func set_active_respawn_point(point: RespawnPoint) -> void:
 	# 停用所有其他重生點
 	for rp in registered_respawn_points:
-		if rp != respawn_point and is_instance_valid(rp):
+		if rp != point and is_instance_valid(rp):
 			rp.deactivate()
 	
 	# 設定新的活躍重生點
-	active_respawn_point = respawn_point
+	active_respawn_point = point
 	
 	if active_respawn_point:
 		respawn_position = active_respawn_point.get_respawn_position()
@@ -48,10 +48,10 @@ func set_active_respawn_point(respawn_point: RespawnPoint) -> void:
 		# 保存重生點數據
 		save_respawn_data()
 		
-		respawn_point_activated.emit(respawn_point)
+		respawn_point_activated.emit(point)
 
-func _on_respawn_point_activated(respawn_point: RespawnPoint) -> void:
-	set_active_respawn_point(respawn_point)
+func _on_respawn_point_activated(point: RespawnPoint) -> void:
+	set_active_respawn_point(point)
 
 func get_respawn_position() -> Vector2:
 	if active_respawn_point and is_instance_valid(active_respawn_point):
@@ -148,12 +148,9 @@ func _respawn_in_current_room(player: Node, position: Vector2) -> void:
 	
 	# 重置遊戲狀態
 	get_tree().paused = false
-	if get_node_or_null("/root/GameManager"):
-		var game_manager = get_node("/root/GameManager")
-		if game_manager.has_method("resume_game"):
-			game_manager.resume_game()
-		if game_manager.has_method("cleanup_game_over_screen"):
-			game_manager.cleanup_game_over_screen()
+	var game_core = get_node_or_null("/root/GameCore")
+	if game_core and game_core.has_method("resume_game"):
+		game_core.resume_game()
 	
 	player_respawned.emit(position)
 
@@ -188,21 +185,7 @@ func save_respawn_data() -> void:
 		"respawn_room": respawn_room,
 		"has_active_point": has_active_respawn_point()
 	}
-	
-	# 保存到文件或遊戲狀態
-	if get_node_or_null("/root/GameManager"):
-		var game_manager = get_node("/root/GameManager")
-		if game_manager.has_method("set_respawn_data"):
-			game_manager.set_respawn_data(save_data)
 
-func load_respawn_data() -> void:
-	if get_node_or_null("/root/GameManager"):
-		var game_manager = get_node("/root/GameManager")
-		if game_manager.has_method("get_respawn_data"):
-			var save_data = game_manager.get_respawn_data()
-			if save_data:
-				respawn_position = save_data.get("respawn_position", Vector2.ZERO)
-				respawn_room = save_data.get("respawn_room", "")
 
 func clear_all_respawn_points() -> void:
 	for rp in registered_respawn_points:
@@ -214,14 +197,3 @@ func clear_all_respawn_points() -> void:
 	respawn_position = Vector2.ZERO
 	respawn_room = ""
 
-# 為MetSys SaveManager提供數據
-func get_save_data() -> Dictionary:
-	return {
-		"respawn_position": respawn_position,
-		"respawn_room": respawn_room,
-		"has_active_point": has_active_respawn_point()
-	}
-
-func set_save_data(data: Dictionary):
-	respawn_position = data.get("respawn_position", Vector2.ZERO)
-	respawn_room = data.get("respawn_room", "")

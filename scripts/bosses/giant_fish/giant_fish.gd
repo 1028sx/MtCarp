@@ -1,4 +1,4 @@
-extends "res://scripts/bosses/boss_base.gd"
+extends BossBase
 
 class_name GiantFish
 
@@ -85,10 +85,15 @@ enum GiantFishState {
 @export var bubbles_per_attack_phase2: int = 7
 #endregion
 
-#region 節點引用
+#region 預載入類引用
+const SpawnableManagerClass = preload("res://scripts/bosses/spawnable_manager.gd")
+const BubbleFieldControllerClass = preload("res://scripts/bosses/bubble_field_controller.gd")
+#endregion
+
+#region 節點引用和實例變數
 @onready var collision_shape_node: CollisionShape2D = $CollisionShape2D
-@onready var spawnable_manager: SpawnableManager
-@onready var bubble_field_controller: BubbleFieldController
+var spawnable_manager: SpawnableManager
+var bubble_field_controller: BubbleFieldController
 #endregion
 
 #region 狀態變量
@@ -145,13 +150,16 @@ var initial_max_health: float = 0.0
 
 func _ready() -> void:
 	super._ready()
+	
+	# 設置boss名稱用於loot系統
+	boss_name = "giant_fish"
 
 	# 初始化衍生物管理器
-	spawnable_manager = SpawnableManager.new()
+	spawnable_manager = SpawnableManagerClass.new()
 	add_child(spawnable_manager)
 	
 	# 初始化泡泡場地控制系統
-	bubble_field_controller = BubbleFieldController.new()
+	bubble_field_controller = BubbleFieldControllerClass.new()
 	add_child(bubble_field_controller)
 	bubble_field_controller.bubble_scene = bubble_scene
 	bubble_field_controller.cooldown_time = 8.0
@@ -237,6 +245,9 @@ func _initialize_attack_cooldowns():
 
 func _initialize_field_controller():
 	"""初始化場地控制系統"""
+	# 等待0.5秒確保玩家完全進入房間後再啟動場地系統
+	await get_tree().create_timer(0.5).timeout
+	
 	if bubble_field_controller and target_player and spawnable_manager:
 		bubble_field_controller.initialize(self, target_player, spawnable_manager)
 		
@@ -1296,9 +1307,12 @@ func _on_defeated():
 	else:
 		await get_tree().create_timer(1.0).timeout 
 	
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager and game_manager.has_method("on_boss_defeated"):
-		game_manager.on_boss_defeated(self.name)
-	
 	queue_free()
+
+func _spawn_boss_loot() -> void:
+	var reward_system = get_node_or_null("/root/RewardSystem")
+	if not reward_system:
+		push_warning("找不到 RewardSystem，無法生成 Boss loot")
+		return
+
 #endregion

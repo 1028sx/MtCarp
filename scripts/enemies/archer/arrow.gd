@@ -33,7 +33,7 @@ func _physics_process(delta):
 		var collider = collision.get_collider()
 		if collider.is_in_group("player"):
 			if collider.has_method("take_damage"):
-				collider.take_damage(damage, self)
+				collider.take_damage(damage)
 		queue_free()
 #endregion
 
@@ -42,6 +42,6 @@ func _on_hit_box_area_entered(area):
 	var body = area.get_parent()
 	if body.is_in_group("player"):
 		if body.has_method("take_damage"):
-			body.take_damage(damage, self)
+			body.take_damage(damage)
 		queue_free()
 #endregion

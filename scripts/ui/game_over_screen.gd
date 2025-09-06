@@ -5,22 +5,25 @@ extends CanvasLayer
 @onready var max_combo_label = $CenterContainer/VBoxContainer/VBoxContainer_Stats/Label_MaxCombo
 @onready var gold_label = $CenterContainer/VBoxContainer/VBoxContainer_Stats/Label_Gold
 @onready var links_label = $CenterContainer/VBoxContainer/HBoxContainer_Links/Label
+@onready var discord_button = $CenterContainer/VBoxContainer/HBoxContainer_Links/Button_Discord
+@onready var github_button = $CenterContainer/VBoxContainer/HBoxContainer_Links/Button_GitHub
+@onready var feedback_button = $CenterContainer/VBoxContainer/HBoxContainer_Links/Button_Feedback
+
+var ui_system: Node
 
 const DISCORD_ID = "613878521898598531"
 const GITHUB_URL = "https://github.com/1028sx/graduation_project"
 const FEEDBACK_URL = "https://forms.gle/GzWnzdix2vK2M4747"
 
 func _ready() -> void:
-	# 初始時隱藏
 	hide()
-	# 確保在暫停時仍能運作
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	add_to_group("game_over_screen")
+	
+	# 獲取UISystem引用
+	ui_system = get_node_or_null("/root/UISystem")
 	
 	# 設置按鈕信號
-	var discord_button = $CenterContainer/VBoxContainer/HBoxContainer_Links/Button_Discord
-	var github_button = $CenterContainer/VBoxContainer/HBoxContainer_Links/Button_GitHub
-	var feedback_button = $CenterContainer/VBoxContainer/HBoxContainer_Links/Button_Feedback
-	
 	discord_button.pressed.connect(_on_discord_pressed)
 	github_button.pressed.connect(_on_github_pressed)
 	feedback_button.pressed.connect(_on_feedback_pressed)
@@ -29,10 +32,13 @@ func _ready() -> void:
 func show_screen() -> void:
 	# 顯示統計數據
 	call_deferred("_update_stats")
-	# 顯示畫面
 	show()
-	# 確保遊戲暫停
-	get_tree().paused = true
+	
+	# 使用UISystem管理狀態
+	if ui_system:
+		ui_system.change_ui_state(ui_system.UIState.GAME_OVER)
+	else:
+		get_tree().paused = true
 
 func _input(event: InputEvent) -> void:
 	if not visible:
@@ -43,59 +49,50 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 func _update_stats() -> void:
-	# Add null checks before accessing properties
-	if play_time_label == null:
-		return
-	if kill_count_label == null:
-		return
-	if max_combo_label == null:
-		return
-	if gold_label == null:
-		return
-	# links_label is used in other functions, check there if issues arise.
-
-	var game_manager = get_tree().get_first_node_in_group("game_manager")
-	if game_manager:
+	var combat_system = get_node_or_null("/root/CombatSystem")
+	
+	var progress_system = get_node_or_null("/root/ProgressSystem")
+	if progress_system:
 		# 格式化遊戲時間
-		var total_seconds: int = int(game_manager.play_time)
+		var total_seconds: int = int(progress_system.get_play_time())
 		var minutes: int = floori(total_seconds / 60.0)
 		var seconds: int = total_seconds % 60
 		play_time_label.text = "遊戲時間：%02d:%02d" % [minutes, seconds]
-		
-		# 更新其他統計數據
-		kill_count_label.text = "擊殺數：%d" % game_manager.kill_count
-		max_combo_label.text = "最大連擊：%d" % game_manager.max_combo
-		gold_label.text = "獲得金幣：%d" % game_manager.gold
+		gold_label.text = "獲得金幣：%d" % progress_system.get_gold()
+	else:
+		play_time_label.text = "遊戲時間：00:00"
+		gold_label.text = "獲得金幣：0"
+	
+	# 獲取戰鬥數據
+	if combat_system:
+		kill_count_label.text = "擊殺數：%d" % combat_system.get_kill_count()
+		max_combo_label.text = "最大連擊：%d" % combat_system.get_max_combo()
+	else:
+		kill_count_label.text = "擊殺數：0"
+		max_combo_label.text = "最大連擊：0"
 
 func _on_discord_pressed() -> void:
 	# 複製 Discord ID 到剪貼簿
 	DisplayServer.clipboard_set(DISCORD_ID)
 	
-	# 更新提示文字
-	var original_text = links_label.text # This line might error if links_label is null
+	var original_text = links_label.text
 	links_label.text = "已複製使用者ID！"
 	
-	# 創建一個計時器來恢復文字
-	var timer = get_tree().create_timer(2.0)  # 2秒後恢復
+	# 創建計時器來恢復文字
+	var timer = get_tree().create_timer(2.0)
 	await timer.timeout
 	links_label.text = original_text
 
 func _on_github_pressed() -> void:
-	var error = OS.shell_open(GITHUB_URL)
-	if error != OK:
-		links_label.text = "無法開啟 GitHub 連結" # This line might error if links_label is null
-		var timer = get_tree().create_timer(2.0)
-		await timer.timeout
-		links_label.text = ""
+	OS.shell_open(GITHUB_URL)
 
 func _on_feedback_pressed() -> void:
-	var error = OS.shell_open(FEEDBACK_URL)
-	if error != OK:
-		links_label.text = "無法開啟回饋表單連結" # This line might error if links_label is null
-		var timer = get_tree().create_timer(2.0)
-		await timer.timeout
-		links_label.text = ""
+	OS.shell_open(FEEDBACK_URL)
 
 func _back_to_menu() -> void:
-	get_tree().paused = false  # 取消暫停
-	get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")
+	if ui_system:
+		ui_system.change_ui_state(ui_system.UIState.MENU, false)
+		await ui_system.request_scene_transition("res://scenes/ui/main_menu.tscn")
+	else:
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://scenes/ui/main_menu.tscn")

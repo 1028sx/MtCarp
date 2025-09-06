@@ -1,5 +1,5 @@
 class_name PlayerWallSlideState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var fall_state: PlayerState
 @export var jump_state: PlayerState

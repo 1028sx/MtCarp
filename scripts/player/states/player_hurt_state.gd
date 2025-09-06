@@ -1,5 +1,5 @@
 class_name PlayerHurtState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var hurt_duration = 0.3
 var hurt_timer = 0.0

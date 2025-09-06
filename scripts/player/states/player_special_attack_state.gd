@@ -1,5 +1,5 @@
 class_name PlayerSpecialAttackState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var idle_state: PlayerState
 @export var fall_state: PlayerState
@@ -50,14 +50,9 @@ func on_frame_changed(frame: int) -> void:
 		
 	if player.animated_sprite.animation == "special_attack":
 		var is_damage_frame := false
-		if player.active_effects.has("multi_strike"):
-			# 在 multi_strike 效果下，5到9幀都造成傷害
-			if frame >= DAMAGE_START_FRAME and frame <= DAMAGE_END_FRAME:
-				is_damage_frame = true
-		else:
-			# 普通情況下，只在第 5, 7, 9 幀造成傷害
-			if frame in [DAMAGE_START_FRAME, DAMAGE_START_FRAME + 2, DAMAGE_END_FRAME]:
-				is_damage_frame = true
+		# 只在第 5, 7, 9 幀造成傷害
+		if frame in [DAMAGE_START_FRAME, DAMAGE_START_FRAME + 2, DAMAGE_END_FRAME]:
+			is_damage_frame = true
 
 		if is_damage_frame:
 			# 每次傷害判定前清空命中列表，以實現多段傷害
@@ -87,35 +82,11 @@ func _apply_special_attack_damage() -> void:
 			var damage = player.base_special_attack_damage
 			var knockback_force = Vector2(0, -1) * 300
 
-			if player.active_effects.has("multi_strike"):
-				var frame_damage_bonus = max(0, player.animated_sprite.frame - DAMAGE_START_FRAME) * 5
-				damage += frame_damage_bonus
-				knockback_force *= 5
 
-			if player.active_effects.has("rage"):
-				var rage_bonus = player.rage_stack * player.rage_damage_bonus
-				damage *= (1 + rage_bonus)
 
-			var trigger_harvest = false
-			if player.active_effects.has("harvest"):
-				var enemy_health = 0.0
-				if body.has_method("get_health"): enemy_health = body.get_health()
-				elif body.has_method("get_current_health"): enemy_health = body.get_current_health()
-				else:
-					enemy_health = body.get("health") if body.get("health") != null else 0.0
-					if enemy_health == 0.0: enemy_health = body.get("current_health") if body.get("current_health") != null else 0.0
-
-				if damage >= enemy_health and enemy_health > 0:
-					trigger_harvest = true
 
 			if body.has_method("apply_knockback"):
 				body.apply_knockback(knockback_force)
 
 			body.take_damage(damage, player)
 
-			if trigger_harvest:
-				var heal_amount = player.max_health * 0.05
-				player.current_health = min(player.current_health + heal_amount, player.max_health)
-				player.health_changed.emit(player.current_health)
-				if player.player_effect_manager:
-					player.player_effect_manager.play_heal_effect()

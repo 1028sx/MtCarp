@@ -29,7 +29,6 @@ func _ready() -> void:
 
 func _setup_word_collection() -> void:
 	if not collected_words:
-		push_error("[WordUI] 找不到collected_words節點")
 		return
 		
 	collected_words.custom_minimum_size = Vector2(600, 200)
@@ -38,13 +37,11 @@ func _setup_word_collection() -> void:
 	collected_words.mouse_filter = Control.MOUSE_FILTER_PASS
 	collected_words.process_mode = Node.PROCESS_MODE_ALWAYS
 	
-	var word_system = get_node("/root/WordSystem")
+	var word_system = WordSystem
 	if word_system:
 		word_system.words_updated.connect(_on_words_updated)
 		_on_words_updated(word_system.collected_words)
 		update_idiom_hints([])
-	else:
-		push_error("[WordUI] 找不到word_system")
 #endregion
 
 #region 文字管理
@@ -80,7 +77,7 @@ func remove_word_from_slot(word: String) -> void:
 		word_states[word]["in_slot"] = false
 		word_states[word]["slot_index"] = -1
 		
-		var word_system = get_tree().get_first_node_in_group("word_system")
+		var word_system = WordSystem
 		if word_system:
 			word_system.update_active_effects("")
 #endregion
@@ -90,9 +87,9 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 		
-	var global_ui = get_node_or_null("/root/GlobalUi")
-	if global_ui and global_ui.has_method("is_other_ui_visible"):
-		if global_ui.is_other_ui_visible("inventory"):
+	var ui_system = get_node_or_null("/root/UISystem")
+	if ui_system and ui_system.has_method("is_other_ui_visible"):
+		if ui_system.is_other_ui_visible("inventory"):
 			return
 		
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
@@ -126,7 +123,6 @@ func _input(event: InputEvent) -> void:
 						word_instance.custom_minimum_size = Vector2(50, 50)
 						collected_words.add_child(word_instance)
 						get_viewport().set_input_as_handled()
-			get_viewport().set_input_as_handled()
 #endregion
 
 #region 輔助函數
@@ -175,9 +171,9 @@ func _notification(what: int) -> void:
 			if visible:
 				process_mode = Node.PROCESS_MODE_ALWAYS
 				_setup_mouse_filters(self)
-				var global_ui = get_node_or_null("/root/GlobalUi")
-				if global_ui and global_ui.has_method("is_other_ui_visible"):
-					if global_ui.is_other_ui_visible("inventory"):
+				var ui_system = get_node_or_null("/root/UISystem")
+				if ui_system and ui_system.has_method("is_other_ui_visible"):
+					if ui_system.is_other_ui_visible("inventory"):
 						set_process_input(false)
 					else:
 						set_process_input(true)
@@ -199,12 +195,12 @@ func update_idiom_hints(_available_idioms: Array) -> void:
 	for child in idiom_hints.get_children():
 		child.queue_free()
 	
-	var word_system = get_tree().get_first_node_in_group("word_system")
+	var word_system = WordSystem
 	if not word_system:
-		push_error("[WordUI] 找不到word_system")
 		return
 	
-	for idiom in word_system.IDIOMS:
+	var available_idioms = word_system.check_idioms()
+	for idiom in available_idioms:
 		var label = Label.new()
 		var display_text = ""
 		var characters = idiom.split("")

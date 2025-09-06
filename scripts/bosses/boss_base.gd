@@ -2,8 +2,7 @@ extends CharacterBody2D
 
 class_name BossBase
 
-# Preload the PlayerGlobal script resource to call static functions from the type
-const PlayerGlobalScript = preload("res://scripts/globals/PlayerGlobal.gd")
+# 直接使用 PlayerSystem 單例
 
 #region Boss 相關信號
 signal phase_changed(phase: int)
@@ -113,11 +112,11 @@ func _ready() -> void:
 
 	self.interrupted.connect(_on_interrupted)
 
-	if PlayerGlobal and PlayerGlobalScript.is_player_available():
-		target_player = PlayerGlobalScript.get_player()
+	if PlayerSystem.is_player_available():
+		target_player = PlayerSystem.get_player()
 	
-	if PlayerGlobal and not PlayerGlobal.player_registration_changed.is_connected(_on_player_registration_changed):
-		PlayerGlobal.player_registration_changed.connect(_on_player_registration_changed)
+	if not PlayerSystem.player_registration_changed.is_connected(_on_player_registration_changed):
+		PlayerSystem.player_registration_changed.connect(_on_player_registration_changed)
 
 	if animated_sprite:
 		if not animated_sprite.animation_finished.is_connected(_on_animation_finished):
@@ -129,10 +128,10 @@ func _ready() -> void:
 		state_label.visible = debug_mode
 
 func is_player_valid(p_player: Node) -> bool:
-	if not PlayerGlobal:
-		printerr("[Boss.is_player_valid] PlayerGlobal not available!")
+	if not PlayerSystem:
+		printerr("[Boss.is_player_valid] PlayerSystem not available!")
 		return false
-	return p_player != null and is_instance_valid(p_player) and p_player == PlayerGlobalScript.get_player()
+	return p_player != null and is_instance_valid(p_player) and p_player == PlayerSystem.get_player()
 
 func _handle_vision_cone_detection(_delta: float) -> void:
 	pass
@@ -141,8 +140,8 @@ func _physics_process(delta: float) -> void:
 	if not active: return
 
 	if not is_instance_valid(target_player):
-		if PlayerGlobal and PlayerGlobalScript.is_player_available():
-			var player_from_global = PlayerGlobalScript.get_player()
+		if PlayerSystem.is_player_available():
+			var player_from_global = PlayerSystem.get_player()
 			if is_instance_valid(player_from_global):
 				target_player = player_from_global
 	
@@ -322,7 +321,7 @@ func _select_attack() -> void:
 
 func _apply_attack_damage(body: Node2D, damage_amount: float, knockback_force: Vector2 = Vector2.ZERO) -> void:
 	if body.has_method("take_damage"):
-		body.take_damage(damage_amount, self)
+		body.take_damage(damage_amount)
 	
 	if knockback_force != Vector2.ZERO and body.has_method("apply_knockback"):
 		body.apply_knockback(knockback_force)
@@ -364,6 +363,10 @@ func take_damage(amount: float, _attacker: Node) -> void:
 func _handle_defeat() -> void:
 	current_health = 0
 	_change_state(BossState.DEFEATED)
+	
+	# 清理所有衍生物
+	_cleanup_all_spawnables()
+	
 	boss_defeated.emit()
 	
 	if hitbox:
@@ -529,7 +532,7 @@ func _on_defeated_animation_finished() -> void:
 	queue_free()
 
 func _on_detection_area_body_entered(body: Node2D) -> void:
-	if PlayerGlobal and PlayerGlobalScript.get_player() == body and not is_instance_valid(target_player):
+	if PlayerSystem.get_player() == body and not is_instance_valid(target_player):
 		target_player = body as CharacterBody2D
 
 		var boss_state_count_da_entered: int = BossState.size()
@@ -537,7 +540,7 @@ func _on_detection_area_body_entered(body: Node2D) -> void:
 			pass
 		if current_state == BossState.IDLE:
 			_change_state(BossState.APPEAR)
-	elif PlayerGlobal and PlayerGlobalScript.get_player() == body and is_instance_valid(target_player):
+	elif PlayerSystem.get_player() == body and is_instance_valid(target_player):
 		var boss_state_count_da_entered_elif: int = BossState.size()
 		if current_state >= 0 and current_state < boss_state_count_da_entered_elif:
 			pass
@@ -547,7 +550,7 @@ func _on_detection_area_body_exited(body: Node) -> void:
 		target_player = null
 
 func _on_attack_area_body_entered(body: Node2D) -> void:
-	if PlayerGlobal and PlayerGlobalScript.get_player() == body:
+	if PlayerSystem.get_player() == body:
 		var damage = attack_damage
 		if current_state == BossState.SPECIAL_ATTACK:
 			damage = special_attack_damage
@@ -579,15 +582,27 @@ func _on_touch_damage_area_entered(area: Area2D) -> void:
 		var player_node = area.get_owner()
 		if player_node and player_node.has_method("take_damage"):
 			# 對玩家造成傷害
-			player_node.take_damage(touch_damage, self)
+			player_node.take_damage(touch_damage)
 			# 啟動冷卻計時器
 			touch_damage_cooldown_timer.start()
 
 func _on_player_registration_changed(_is_registered: bool) -> void:
-	if _is_registered and PlayerGlobal and PlayerGlobalScript.is_player_available():
-		target_player = PlayerGlobalScript.get_player()
+	if _is_registered and PlayerSystem.is_player_available():
+		target_player = PlayerSystem.get_player()
 	else:
 		target_player = null
+
+# BOSS死亡時清理所有衍生物（統一方法）
+func _cleanup_all_spawnables() -> void:
+	var spawnable_group = boss_name.to_lower() + "_spawnables"
+	var spawnables = get_tree().get_nodes_in_group(spawnable_group)
+	
+	for spawnable in spawnables:
+		if is_instance_valid(spawnable):
+			if spawnable.has_method("cleanup"):
+				spawnable.cleanup()
+			else:
+				spawnable.queue_free()
 
 func _on_interrupted(_attack_name: String) -> void:
 	pass

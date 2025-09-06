@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=4 uid="uid://cj3ijlhlui7k7"]
+[gd_scene load_steps=7 format=4 uid="uid://cwlnqq52r5bk4"]
 
 [ext_resource type="Texture2D" uid="uid://2667v46bvcm3" path="res://assets/environment/Tileset.png" id="1_25pha"]
 [ext_resource type="PackedScene" uid="uid://8022g12qnv2t" path="res://scenes/rooms/components/parallax_background.tscn" id="4_snsjn"]

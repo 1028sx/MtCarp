@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=4 uid="uid://dsqkbvfrnibpg"]
+[gd_scene load_steps=7 format=4 uid="uid://tlinqty5lf8a"]
 
 [ext_resource type="Texture2D" uid="uid://2667v46bvcm3" path="res://assets/environment/Tileset.png" id="1_25pha"]
 [ext_resource type="PackedScene" uid="uid://8022g12qnv2t" path="res://scenes/rooms/components/parallax_background.tscn" id="4_snsjn"]
@@ -65,3 +65,6 @@ tile_set = SubResource("TileSet_jg0kr")
 position = Vector2(512, 1520)
 
 [node name="RoomInstance" parent="." instance=ExtResource("6_f4ff1")]
+
+[node name="loot_spawn_position" type="Marker2D" parent="." groups=["loot_spawn_position"]]
+position = Vector2(644, 1344)

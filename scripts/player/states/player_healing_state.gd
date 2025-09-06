@@ -1,5 +1,5 @@
 class_name PlayerHealingState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 signal healing_completed
 

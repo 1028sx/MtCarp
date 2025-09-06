@@ -1,5 +1,5 @@
 class_name PlayerFallState
-extends PlayerState
+extends "res://scripts/player/player_state.gd"
 
 @export var idle_state: PlayerState
 @export var jump_state: PlayerState
@@ -30,7 +30,8 @@ func process_physics(delta: float) -> void:
 	else:
 		player.velocity.x = move_toward(player.velocity.x, 0, current_speed)
 
-	if wall_slide_state and not player.is_on_floor() and player.wall_jump_cooldown_timer <= 0:
+	# 檢查牆跳能力是否已解鎖
+	if wall_slide_state and not player.is_on_floor() and player.wall_jump_cooldown_timer <= 0 and player.has_ability("wall_jump"):
 		var wall_normal = player.get_raycast_wall_normal()
 		if wall_normal != Vector2.ZERO:
 			state_machine._transition_to(wall_slide_state)

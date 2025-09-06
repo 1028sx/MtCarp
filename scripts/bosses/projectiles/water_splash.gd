@@ -1,6 +1,6 @@
 extends Area2D
 
-class_name WaterSplashProjectile
+class_name WaterSplash_projectile
 
 @export var damage: float = 15.0
 @export var lifetime: float = 5.0
@@ -20,6 +20,9 @@ func _ready():
 	body_entered.connect(_on_body_entered)
 	area_entered.connect(_on_area_entered)
 	visibility_notifier.screen_exited.connect(_on_screen_exited)
+	
+	# 加入BOSS衍生物組（統一清理用）
+	add_to_group("giantfish_spawnables")
 	
 	# 播放出現動畫
 	if animated_sprite and animated_sprite.sprite_frames.has_animation("appear"):
@@ -78,7 +81,7 @@ func _on_body_entered(body: Node2D):
 		
 	# 檢查是否撞到玩家
 	if body.has_method("take_damage") and not has_hit_player:
-		body.take_damage(damage, self)
+		body.take_damage(damage)
 		has_hit_player = true
 		# 不銷毀，繼續飛行
 		return
@@ -90,7 +93,7 @@ func _on_area_entered(area: Area2D):
 	# 如果玩家有受傷區域（Area2D）
 	var parent = area.get_parent()
 	if parent and parent.has_method("take_damage") and not has_hit_player:
-		parent.take_damage(damage, self)
+		parent.take_damage(damage)
 		has_hit_player = true
 		# 不銷毀，繼續飛行
 
@@ -119,6 +122,10 @@ func _on_destroy_finished():
 # SpawnableManager 類型檢測
 func get_spawnable_type() -> String:
 	return "water_splash"
+
+# 統一清理接口
+func cleanup():
+	_destroy()
 
 func reset():
 	"""物件池重置函數"""
